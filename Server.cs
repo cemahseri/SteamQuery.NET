@@ -4,29 +4,29 @@ using System.Linq;
 using System.Net;
 using System.Net.Sockets;
 using System.Threading.Tasks;
+using SteamQuery.Exceptions;
 using SteamQuery.Helpers;
 using SteamQuery.Models;
 
 namespace SteamQuery
 {
+    // Will add later comment blocks.
     public sealed class Server : IDisposable
     {
-        public Informations Informations { get; set; } = new Informations();
-
         public IPAddress Ip { get; set; }
         public int Port { get; set; }
         
-        // Don't ask me why the fuck I am not using T*DO. I just don't.
-        // Will implement them later.
-        public bool ParsePlayersOnConnection { get; set; }
-        public bool ParseRulessOnConnection { get; set; }
-
         // Timeout times doesn't work on async as I see. Will look into this later. Might have to do something like "Task.WhenAny(DoQuery, Task.Delay(Timeout))" or something like that, IDK.
         public int SendTimeout { get; set; } = 5000;
         public int ReceiveTimeout { get; set; } = 5000;
 
         private readonly UdpClient _udpClient;
         private readonly IPEndPoint _ipEndPoint;
+
+        private static readonly byte[] Prefix = { 0xFF, 0xFF, 0xFF, 0xFF }; // Every query starts with this.
+        private static readonly byte[] Informations = { 0x54, 0x53, 0x6F, 0x75, 0x72, 0x63, 0x65, 0x20, 0x45, 0x6E, 0x67, 0x69, 0x6E, 0x65, 0x20, 0x51, 0x75, 0x65, 0x72, 0x79, 0x00 };
+        private static readonly byte[] Players = { 0x55, 0xFF, 0xFF, 0xFF, 0xFF };
+        private static readonly byte[] Rules = { 0x56, 0xFF, 0xFF, 0xFF, 0xFF };
 
         public Server()
         {
@@ -59,60 +59,47 @@ namespace SteamQuery
                     ReceiveTimeout = ReceiveTimeout
                 }
             };
-
-            // LMAO, what this shit does right here?
-            ConnectAsync();
         }
 
-        public async void ConnectAsync()
+        public async Task<bool> ConnectAsync()
         {
+            if (Ip == null || Port <= 0)
+            {
+                return false;
+            }
+
             await _udpClient.Client.ConnectAsync(_ipEndPoint).ConfigureAwait(false);
-            
-            // ROFLULMAO, look at this mess.
-            await GetInformationsAsync().ConfigureAwait(false);
-            await GetPlayersAsync().ConfigureAwait(false);
-            await GetRulesAsync().ConfigureAwait(false);
+
+            // This will return true even if it's not connected properly.
+            // Will make custom check later.
+            return _udpClient.Client.Connected;
         }
 
-        // Now that's a lot of code duplication!
-        // And also, for now, this shit only supports Source games. Will make this support other protocols too.
-        public async Task<Informations> GetInformationsAsync()
+        public async Task<Informations> GetInformationsAsync() => ResponseParseHelper.ParseInformation(await ExecuteQueryAsync(Informations));
+
+        public async Task<List<Player>> GetPlayersAsync() => ResponseParseHelper.ParsePlayers(await ExecuteQueryAsync(Players));
+
+        public async Task<List<Rule>> GetRulesAsync() => ResponseParseHelper.ParseRules(await ExecuteQueryAsync(Rules));
+
+        private async Task<byte[]> ExecuteQueryAsync(IReadOnlyList<byte> rawQuery)
         {
-            var query = QueryHelper.Prefix.Concat(QueryHelper.Informations).ToArray();
+            var query = Prefix.Concat(rawQuery).ToArray();
+
             await _udpClient.SendAsync(query, query.Length).ConfigureAwait(false);
-            
             var response = _udpClient.ReceiveAsync().ConfigureAwait(false).GetAwaiter().GetResult().Buffer;
-            return ResponseParseHelper.ParseInformation(Informations, response);
-        }
-        
-        public async Task<List<Player>> GetPlayersAsync()
-        {
-            var query = QueryHelper.Prefix.Concat(QueryHelper.Players).ToArray();
-            await _udpClient.SendAsync(query, query.Length).ConfigureAwait(false);
-            
-            var response = _udpClient.ReceiveAsync().ConfigureAwait(false).GetAwaiter().GetResult().Buffer;
-            response[4] = 0x55;
-            
-            var index = 5;
-            for (var i = 5; i <= 8; i++)
+
+            switch (rawQuery[0])
             {
-                response[i] = response.ReadByte(ref index);
+                case 0x54:
+                    return response;
+                case 0x55:
+                case 0x56:
+                    response[4] = rawQuery[0];
+                    break;
+                default:
+                    throw new UnexpectedByteException(rawQuery[0], 0x54, 0x55, 0x56);
             }
 
-            await _udpClient.SendAsync(response, response.Length).ConfigureAwait(false);
-
-            response = _udpClient.ReceiveAsync().ConfigureAwait(false).GetAwaiter().GetResult().Buffer;
-            return ResponseParseHelper.ParsePlayers(Informations.Players, response);
-        }
-        
-        public async Task<List<Rule>> GetRulesAsync()
-        {
-            var query = QueryHelper.Prefix.Concat(QueryHelper.Rules).ToArray();
-            await _udpClient.SendAsync(query, query.Length).ConfigureAwait(false);
-            
-            var response = _udpClient.ReceiveAsync().ConfigureAwait(false).GetAwaiter().GetResult().Buffer;
-            response[4] = 0x56;
-            
             var index = 5;
             for (var i = 5; i <= 8; i++)
             {
@@ -120,9 +107,7 @@ namespace SteamQuery
             }
             
             await _udpClient.SendAsync(response, response.Length).ConfigureAwait(false);
-            
-            response = _udpClient.ReceiveAsync().ConfigureAwait(false).GetAwaiter().GetResult().Buffer;
-            return ResponseParseHelper.ParseRules(Informations.Rules, response);
+            return _udpClient.ReceiveAsync().ConfigureAwait(false).GetAwaiter().GetResult().Buffer;
         }
 
         // Check DisconnectAsync later.

@@ -1,41 +1,52 @@
 ﻿using System.Collections.Generic;
 using SteamQuery.Enums;
+using SteamQuery.Exceptions;
 using SteamQuery.Models;
 
 namespace SteamQuery.Helpers
 {
     public static class ResponseParseHelper
     {
-        public static Informations ParseInformation(Informations informations, byte[] response)
+        public static Informations ParseInformation(byte[] response)
         {
+            var informations = new Informations();
+
             var index = 5; // First 4 bytes are FF prefixes and the other byte is header. Headers are always the same and we do not need them, so skip first 5 bytes.
-            
+
             informations.Protocol = response.ReadByte(ref index);
             informations.ServerName = response.ReadString(ref index);
             informations.Map = response.ReadString(ref index);
             informations.Folder = response.ReadString(ref index);
             informations.GameName = response.ReadString(ref index);
             informations.Id = response.ReadShort(ref index);
-            index++; // Skipping informations.Players list here because we are going to get detailed informations of players, not only just count of them.
+
+            var playerCount = response.ReadByte(ref index);
+            for (var i = 0; i < playerCount; i++)
+            {
+                informations.Players.Add(null); // Adding null instead of new object is faster and uses less memory - and also will help while garbage collecting, I guess.
+            }
+
             informations.MaxPlayers = response.ReadByte(ref index);
             informations.Bots = response.ReadByte(ref index);
 
-            informations.ServerType = response.ReadByte(ref index) switch
+            var serverType = response.ReadByte(ref index);
+            informations.ServerType = serverType switch
             {
                 0x64 => ServerType.Dedicated,
                 0x6c => ServerType.NonDedicated,
                 0x00 => ServerType.NonDedicated,
                 0x70 => ServerType.SourceTv,
-                _ => informations.ServerType
+                _ => throw new UnexpectedByteException(serverType, 0x00, 0x64, 0x6c, 0x70)
             };
             
-            informations.Environment = response.ReadByte(ref index) switch
+            var environment = response.ReadByte(ref index);
+            informations.Environment = environment switch
             {
                 0x77 => EnvironmentType.Windows,
                 0x6c => EnvironmentType.Linux,
                 0x6d => EnvironmentType.Mac,
                 0x6f => EnvironmentType.Mac,
-                _ => informations.Environment
+                _ => throw new UnexpectedByteException(environment, 0x6c, 0x6d, 0x6f, 0x77)
             };
             
             informations.Visible = response.ReadByte(ref index) == 0x00;
@@ -43,7 +54,7 @@ namespace SteamQuery.Helpers
             // The Ship is missing here for now. Will add later.
             informations.Version = response.ReadString(ref index);
 
-            if (response.Length - index > 0)
+            if (response.Length - index > 0) // We have the extra flags.
             {
                 informations.ExtraDataFlag = response.ReadByte(ref index);
 
@@ -77,8 +88,10 @@ namespace SteamQuery.Helpers
             return informations;
         }
 
-        public static List<Player> ParsePlayers(List<Player> players, byte[] response)
+        public static List<Player> ParsePlayers(byte[] response)
         {
+            var players = new List<Player>();
+
             var index = 5;
 
             var playerCount = response.ReadByte(ref index);
@@ -96,8 +109,10 @@ namespace SteamQuery.Helpers
             return players;
         }
 
-        public static List<Rule> ParseRules(List<Rule> rules, byte[] response)
+        public static List<Rule> ParseRules(byte[] response)
         {
+            var rules = new List<Rule>();
+
             var index = 5;
 
             var ruleCount = response.ReadShort(ref index);

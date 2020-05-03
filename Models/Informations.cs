@@ -32,8 +32,6 @@ namespace SteamQuery.Models
         public bool VacSecured { get; set; }
 
         public string Version { get; set; }
-        
-        public List<Rule> Rules { get; set; } = new List<Rule>();
 
         // Extra bytes.
         public byte? ExtraDataFlag { get; set; }
