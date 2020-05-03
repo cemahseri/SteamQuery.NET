@@ -102,7 +102,7 @@ namespace SteamQuery.Helpers
                     Index = response.ReadByte(ref index),
                     Name = response.ReadString(ref index),
                     Score = response.ReadLong(ref index),
-                    Duration = response.ReadFloat(ref index)
+                    DurationSecond = response.ReadFloat(ref index)
                 });
             }
 
