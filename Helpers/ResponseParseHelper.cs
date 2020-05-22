@@ -38,7 +38,7 @@ namespace SteamQuery.Helpers
                 0x70 => ServerType.SourceTv,
                 _ => throw new UnexpectedByteException(serverType, 0x00, 0x64, 0x6c, 0x70)
             };
-            
+
             var environment = response.ReadByte(ref index);
             informations.Environment = environment switch
             {
@@ -48,7 +48,7 @@ namespace SteamQuery.Helpers
                 0x6f => EnvironmentType.Mac,
                 _ => throw new UnexpectedByteException(environment, 0x6c, 0x6d, 0x6f, 0x77)
             };
-            
+
             informations.Visible = response.ReadByte(ref index) == 0x00;
             informations.VacSecured = response.ReadByte(ref index) == 0x01;
             // The Ship is missing here for now. Will add later.
