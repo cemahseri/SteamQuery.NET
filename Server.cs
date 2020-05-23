@@ -63,9 +63,14 @@ namespace SteamQuery
 
         public async Task<bool> ConnectAsync()
         {
-            if (Ip == null || Port <= 0)
+            if (Ip == null)
             {
-                return false;
+                throw new AddressNotFoundException();
+            }
+
+            if (Port < 0 || Port > 65535)
+            {
+                throw new InvalidPortException();
             }
 
             await _udpClient.Client.ConnectAsync(_ipEndPoint).ConfigureAwait(false);
@@ -75,11 +80,11 @@ namespace SteamQuery
             return _udpClient.Client.Connected;
         }
 
-        public async Task<Informations> GetInformationsAsync() => ResponseParseHelper.ParseInformation(await ExecuteQueryAsync(Informations));
+        public async Task<Informations> GetInformationsAsync() => ResponseParser.ParseInformation(await ExecuteQueryAsync(Informations));
 
-        public async Task<List<Player>> GetPlayersAsync() => ResponseParseHelper.ParsePlayers(await ExecuteQueryAsync(Players));
+        public async Task<List<Player>> GetPlayersAsync() => ResponseParser.ParsePlayers(await ExecuteQueryAsync(Players));
 
-        public async Task<List<Rule>> GetRulesAsync() => ResponseParseHelper.ParseRules(await ExecuteQueryAsync(Rules));
+        public async Task<List<Rule>> GetRulesAsync() => ResponseParser.ParseRules(await ExecuteQueryAsync(Rules));
 
         private async Task<byte[]> ExecuteQueryAsync(IReadOnlyList<byte> rawQuery)
         {
