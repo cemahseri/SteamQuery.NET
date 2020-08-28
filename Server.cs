@@ -9,10 +9,16 @@ using SteamQuery.Models;
 
 namespace SteamQuery
 {
-    // Will add later comment blocks.
+    /// <summary>
+    /// Server class holds information related to a game server in it.
+    /// </summary>
+    /// <remarks>Thread-safe.</remarks>
     public sealed class Server : IDisposable
     {
         private IPAddress _ip;
+        /// <summary>
+        /// IP address of the server.
+        /// </summary>
         public IPAddress Ip
         {
             get => _ip;
@@ -20,6 +26,9 @@ namespace SteamQuery
         }
 
         private int _port;
+        /// <summary>
+        /// Port number of the server.
+        /// </summary>
         public int Port
         {
             get => _port;
@@ -33,9 +42,18 @@ namespace SteamQuery
                 _port = value;
             }
         }
-        
+
         // Timeout times doesn't work on async as I see. Will look into this later. Might have to do something like "Task.WhenAny(DoQuery, Task.Delay(Timeout))" or something like that, IDK.
+        // Update: Yeah, I got why those doesn't work on asynchronous methods. SendTimeout and ReceiveTimeout only affects synchronous Send and Receives methods. I still might do something I've said before.
+        /// <summary>
+        /// Gets or sets a value that specifies the amount of time after which a synchronous ExecuteQuery call will time out.
+        /// </summary>
+        /// <returns>The time-out value, in milliseconds. If you set the property with a value between 1 and 499, the value will be changed to 500. The default value is 0, which indicates an infinite time-out period. Specifying -1 also indicates an infinite time-out period.</returns>
         public int SendTimeout { get; set; } = 5000;
+        /// <summary>
+        /// Gets or sets a value that specifies the amount of time after which a synchronous ExecuteQuery call will time out.
+        /// </summary>
+        /// <returns>The time-out value, in milliseconds. The default value is 0, which indicates an infinite time-out period. Specifying -1 also indicates an infinite time-out period.</returns>
         public int ReceiveTimeout { get; set; } = 5000;
 
         private readonly UdpClient _udpClient;
@@ -45,22 +63,43 @@ namespace SteamQuery
         private static readonly byte[] Players = { 0xFF, 0xFF, 0xFF, 0xFF, 0x55, 0xFF, 0xFF, 0xFF, 0xFF };
         private static readonly byte[] Rules = { 0xFF, 0xFF, 0xFF, 0xFF, 0x56, 0xFF, 0xFF, 0xFF, 0xFF };
 
+        /// <summary>
+        /// Initialize without providing IP address nor port number. Be sure that you set them before connecting!
+        /// </summary>
         public Server()
         {
         }
 
+        /// <summary>
+        /// Initialize with given IP address and port number with a string parameter.
+        /// </summary>
+        /// <param name="endPoint">IP end point. Seperating IP address and port number with colon (:) required. Example: 127.0.0.1:1337</param>
         public Server(string endPoint) : this(IpHelper.CreateIpEndPoint(endPoint))
         {
         }
 
+        /// <summary>
+        /// Initialize with given IP address <i>(in string type)</i> and port number.
+        /// </summary>
+        /// <param name="ip">IP address.</param>
+        /// <param name="port">Port number.</param>
         public Server(string ip, int port) : this(IpHelper.CreateIpEndPoint(ip, port))
         {
         }
 
+        /// <summary>
+        /// Initialize with given IP address <i>(in IPAddress type)</i> and port number.
+        /// </summary>
+        /// <param name="ip">IP address.</param>
+        /// <param name="port">Port number.</param>
         public Server(IPAddress ip, int port) : this(new IPEndPoint(ip, port))
         {
         }
 
+        /// <summary>
+        /// Initialize with given IP endpoint.
+        /// </summary>
+        /// <param name="ipEndPoint">IP endpoint.</param>
         public Server(IPEndPoint ipEndPoint)
         {
             Ip = ipEndPoint.Address;
@@ -78,6 +117,10 @@ namespace SteamQuery
             };
         }
 
+        /// <summary>
+        /// Connects to the game server synchronously.
+        /// </summary>
+        /// <returns>true if successfully connected to the game server.</returns>
         public bool Connect()
         {
             _udpClient.Client.Connect(_ipEndPoint);
@@ -85,6 +128,10 @@ namespace SteamQuery
             return true;
         }
 
+        /// <summary>
+        /// Connects to the game server asynchronously.
+        /// </summary>
+        /// <returns>true if successfully connected to the game server.</returns>
         public async Task<bool> ConnectAsync()
         {
             await _udpClient.Client.ConnectAsync(_ipEndPoint);
@@ -92,12 +139,30 @@ namespace SteamQuery
             return true;
         }
 
+        /// <summary>
+        /// Gets informations synchronously.
+        /// </summary>
         public Informations GetInformations() => ResponseParser.ParseInformation(ExecuteQuery(Informations));
+        /// <summary>
+        /// Gets players synchronously.
+        /// </summary>
         public List<Player> GetPlayers() => ResponseParser.ParsePlayers(ExecuteQuery(Players));
+        /// <summary>
+        /// Gets rules synchronously.
+        /// </summary>
         public List<Rule> GetRules() => ResponseParser.ParseRules(ExecuteQuery(Rules));
 
+        /// <summary>
+        /// Gets informations asynchronously.
+        /// </summary>
         public async Task<Informations> GetInformationsAsync() => ResponseParser.ParseInformation(await ExecuteQueryAsync(Informations));
+        /// <summary>
+        /// Gets players asynchronously.
+        /// </summary>
         public async Task<List<Player>> GetPlayersAsync() => ResponseParser.ParsePlayers(await ExecuteQueryAsync(Players));
+        /// <summary>
+        /// Gets rules asynchronously.
+        /// </summary>
         public async Task<List<Rule>> GetRulesAsync() => ResponseParser.ParseRules(await ExecuteQueryAsync(Rules));
 
         private byte[] ExecuteQuery(byte[] query)
@@ -157,6 +222,10 @@ namespace SteamQuery
             return secondResult.Buffer;
         }
 
+        /// <summary>
+        /// Disconnects from the game server.
+        /// </summary>
+        /// <returns>true if successfully disconnected from the game server.</returns>
         public bool Disconnect()
         {
             _udpClient.Client.Disconnect(false);
@@ -164,6 +233,9 @@ namespace SteamQuery
             return true;
         }
 
+        /// <summary>
+        /// Disposes the class.
+        /// </summary>
         public void Dispose()
         {
             Disconnect();
