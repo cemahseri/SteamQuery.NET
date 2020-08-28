@@ -10,7 +10,7 @@ namespace SteamQuery.Exceptions
         /// <summary>
         /// Initializes a new instance of the <see cref="InvalidPortException" /> class.
         /// </summary>
-        public InvalidPortException() : base("Port was invalid.")
+        public InvalidPortException() : base("Port number was invalid.")
         {
         }
     }
