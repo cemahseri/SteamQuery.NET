@@ -6,7 +6,7 @@ using SteamQuery.Exceptions;
 
 namespace SteamQuery.Helpers
 {
-    public static class IpHelper
+    internal static class IpHelper
     {
         public static IPEndPoint CreateIpEndPoint(string ip, int port) => CreateIpEndPoint(ip + ":" + port);
 

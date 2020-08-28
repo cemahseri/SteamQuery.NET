@@ -3,7 +3,7 @@ using System.Text;
 
 namespace SteamQuery.Helpers
 {
-    public static class ReaderHelper
+    internal static class ReaderHelper
     {
         public static byte ReadByte(this byte[] source, ref int index) => source[index++];
 
