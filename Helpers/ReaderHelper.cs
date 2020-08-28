@@ -5,15 +5,15 @@ namespace SteamQuery.Helpers
 {
     internal static class ReaderHelper
     {
-        public static byte ReadByte(this byte[] source, ref int index) => source[index++];
+        internal static byte ReadByte(this byte[] source, ref int index) => source[index++];
 
-        public static short ReadShort(this byte[] source, ref int index) => BitConverter.ToInt16(source, (index += 2) - 2); // Might change this later. I find this way cool, different and as same readability as an other way.
+        internal static short ReadShort(this byte[] source, ref int index) => BitConverter.ToInt16(source, (index += 2) - 2); // Might change this later. I find this way cool, different and as same readability as an other way.
 
-        public static long ReadLong(this byte[] source, ref int index) => BitConverter.ToUInt32(source, (index += 4) - 4);
+        internal static long ReadLong(this byte[] source, ref int index) => BitConverter.ToUInt32(source, (index += 4) - 4);
 
-        public static float ReadFloat(this byte[] source, ref int index) => BitConverter.ToSingle(source, (index += 4) - 4);
+        internal static float ReadFloat(this byte[] source, ref int index) => BitConverter.ToSingle(source, (index += 4) - 4);
 
-        public static string ReadString(this byte[] source, ref int index)
+        internal static string ReadString(this byte[] source, ref int index)
         {
             for (var nextNullIndex = index; nextNullIndex < source.Length; nextNullIndex++)
             {

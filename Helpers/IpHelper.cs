@@ -8,9 +8,9 @@ namespace SteamQuery.Helpers
 {
     internal static class IpHelper
     {
-        public static IPEndPoint CreateIpEndPoint(string ip, int port) => CreateIpEndPoint(ip + ":" + port);
+        internal static IPEndPoint CreateIpEndPoint(string ip, int port) => CreateIpEndPoint(ip + ":" + port);
 
-        public static IPEndPoint CreateIpEndPoint(string endPoint)
+        internal static IPEndPoint CreateIpEndPoint(string endPoint)
         {
             if (endPoint.Count(c => c == ':') != 1) // If there is no colon or more than one in the input.
             {
