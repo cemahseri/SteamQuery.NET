@@ -82,18 +82,14 @@ namespace SteamQuery
         {
             _udpClient.Client.Connect(_ipEndPoint);
 
-            // This will return true even if it's not connected properly.
-            // Will make custom check later.
-            return _udpClient.Client.Connected;
+            return true;
         }
 
         public async Task<bool> ConnectAsync()
         {
             await _udpClient.Client.ConnectAsync(_ipEndPoint);
 
-            // This will return true even if it's not connected properly.
-            // Will make custom check later.
-            return _udpClient.Client.Connected;
+            return true;
         }
 
         public Informations GetInformations() => ResponseParser.ParseInformation(ExecuteQuery(Informations));
@@ -161,9 +157,11 @@ namespace SteamQuery
             return secondResult.Buffer;
         }
 
-        public void Disconnect()
+        public bool Disconnect()
         {
             _udpClient.Client.Disconnect(false);
+
+            return true;
         }
 
         public void Dispose()
