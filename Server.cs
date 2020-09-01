@@ -188,7 +188,7 @@ namespace SteamQuery
                 response[i] = response.ReadByte(ref index);
             }
 
-            _udpClient.SendAsync(response, response.Length);
+            _udpClient.Send(response, response.Length);
             return _udpClient.Receive(ref _ipEndPoint);
         }
 
