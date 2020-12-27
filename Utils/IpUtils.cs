@@ -4,9 +4,9 @@ using System.Linq;
 using System.Net;
 using SteamQuery.Exceptions;
 
-namespace SteamQuery.Helpers
+namespace SteamQuery.Utils
 {
-    internal static class IpHelper
+    internal static class IpUtils
     {
         internal static IPEndPoint CreateIpEndPoint(string ip, int port) => CreateIpEndPoint(ip + ":" + port);
 

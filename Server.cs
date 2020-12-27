@@ -4,8 +4,9 @@ using System.Net;
 using System.Net.Sockets;
 using System.Threading.Tasks;
 using SteamQuery.Exceptions;
-using SteamQuery.Helpers;
 using SteamQuery.Models;
+using SteamQuery.Parsers;
+using SteamQuery.Utils;
 
 namespace SteamQuery
 {
@@ -74,7 +75,7 @@ namespace SteamQuery
         /// Initialize with given IP address and port number with a string parameter.
         /// </summary>
         /// <param name="endPoint">IP end point. Seperating IP address and port number with colon (:) required. Example: 127.0.0.1:1337</param>
-        public Server(string endPoint) : this(IpHelper.CreateIpEndPoint(endPoint))
+        public Server(string endPoint) : this(IpUtils.CreateIpEndPoint(endPoint))
         {
         }
 
@@ -83,7 +84,7 @@ namespace SteamQuery
         /// </summary>
         /// <param name="ip">IP address.</param>
         /// <param name="port">Port number.</param>
-        public Server(string ip, int port) : this(IpHelper.CreateIpEndPoint(ip, port))
+        public Server(string ip, int port) : this(IpUtils.CreateIpEndPoint(ip, port))
         {
         }
 
@@ -142,28 +143,28 @@ namespace SteamQuery
         /// <summary>
         /// Gets informations synchronously.
         /// </summary>
-        public Informations GetInformations() => ResponseParser.ParseInformation(ExecuteQuery(Informations));
+        public Informations GetInformations() => InformationParser.Instance.Parse(ExecuteQuery(Informations));
         /// <summary>
         /// Gets players synchronously.
         /// </summary>
-        public List<Player> GetPlayers() => ResponseParser.ParsePlayers(ExecuteQuery(Players));
+        public List<Player> GetPlayers() => PlayerlistParser.Instance.Parse(ExecuteQuery(Players));
         /// <summary>
         /// Gets rules synchronously.
         /// </summary>
-        public List<Rule> GetRules() => ResponseParser.ParseRules(ExecuteQuery(Rules));
+        public List<Rule> GetRules() => RuleParser.Instance.Parse(ExecuteQuery(Rules));
 
         /// <summary>
         /// Gets informations asynchronously.
         /// </summary>
-        public async Task<Informations> GetInformationsAsync() => ResponseParser.ParseInformation(await ExecuteQueryAsync(Informations));
+        public async Task<Informations> GetInformationsAsync() => InformationParser.Instance.Parse(await ExecuteQueryAsync(Informations));
         /// <summary>
         /// Gets players asynchronously.
         /// </summary>
-        public async Task<List<Player>> GetPlayersAsync() => ResponseParser.ParsePlayers(await ExecuteQueryAsync(Players));
+        public async Task<List<Player>> GetPlayersAsync() => PlayerlistParser.Instance.Parse(await ExecuteQueryAsync(Players));
         /// <summary>
         /// Gets rules asynchronously.
         /// </summary>
-        public async Task<List<Rule>> GetRulesAsync() => ResponseParser.ParseRules(await ExecuteQueryAsync(Rules));
+        public async Task<List<Rule>> GetRulesAsync() => RuleParser.Instance.Parse(await ExecuteQueryAsync(Rules));
 
         private byte[] ExecuteQuery(byte[] query)
         {

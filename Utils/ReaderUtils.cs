@@ -1,9 +1,9 @@
 ﻿using System;
 using System.Text;
 
-namespace SteamQuery.Helpers
+namespace SteamQuery.Utils
 {
-    internal static class ReaderHelper
+    internal static class ReaderUtils
     {
         internal static byte ReadByte(this byte[] source, ref int index) => source[index++];
 
