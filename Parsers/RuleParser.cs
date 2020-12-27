@@ -20,7 +20,6 @@ namespace SteamQuery.Parsers
                     Value = input.ReadString(ref index)
                 });
             }
-
             return rules;
         }
     }

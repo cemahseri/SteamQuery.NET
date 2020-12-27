@@ -17,6 +17,14 @@ namespace SteamQuery
     public sealed class Server : IDisposable
     {
         private IPAddress _ip;
+
+        /// <summary>
+        /// Initialize without providing IP address nor port number. Be sure that you set them before connecting!
+        /// </summary>
+        public Server()
+        {
+        }
+
         /// <summary>
         /// IP address of the server.
         /// </summary>
@@ -63,13 +71,6 @@ namespace SteamQuery
         private static readonly byte[] Informations = { 0xFF, 0xFF, 0xFF, 0xFF, 0x54, 0x53, 0x6F, 0x75, 0x72, 0x63, 0x65, 0x20, 0x45, 0x6E, 0x67, 0x69, 0x6E, 0x65, 0x20, 0x51, 0x75, 0x65, 0x72, 0x79, 0x00 };
         private static readonly byte[] Players = { 0xFF, 0xFF, 0xFF, 0xFF, 0x55, 0xFF, 0xFF, 0xFF, 0xFF };
         private static readonly byte[] Rules = { 0xFF, 0xFF, 0xFF, 0xFF, 0x56, 0xFF, 0xFF, 0xFF, 0xFF };
-
-        /// <summary>
-        /// Initialize without providing IP address nor port number. Be sure that you set them before connecting!
-        /// </summary>
-        public Server()
-        {
-        }
 
         /// <summary>
         /// Initialize with given IP address and port number with a string parameter.
@@ -124,7 +125,7 @@ namespace SteamQuery
         /// <returns>true if successfully connected to the game server.</returns>
         public bool Connect()
         {
-            _udpClient.Client.Connect(_ipEndPoint);
+            _udpClient.Connect(_ipEndPoint);
 
             return true;
         }
@@ -139,24 +140,25 @@ namespace SteamQuery
 
             return true;
         }
-
+        
+        //Task.Result blocks until Task has been completed.
         /// <summary>
         /// Gets informations synchronously.
         /// </summary>
-        public Informations GetInformations() => InformationParser.Instance.Parse(ExecuteQuery(Informations));
+        public Informations GetInformation() => GetInformationAsync().Result;
         /// <summary>
         /// Gets players synchronously.
         /// </summary>
-        public List<Player> GetPlayers() => PlayerlistParser.Instance.Parse(ExecuteQuery(Players));
+        public List<Player> GetPlayers() => GetPlayersAsync().Result;
         /// <summary>
         /// Gets rules synchronously.
         /// </summary>
-        public List<Rule> GetRules() => RuleParser.Instance.Parse(ExecuteQuery(Rules));
+        public List<Rule> GetRules() => GetRulesAsync().Result;
 
         /// <summary>
         /// Gets informations asynchronously.
         /// </summary>
-        public async Task<Informations> GetInformationsAsync() => InformationParser.Instance.Parse(await ExecuteQueryAsync(Informations));
+        public async Task<Informations> GetInformationAsync() => InformationParser.Instance.Parse(await ExecuteQueryAsync(Informations));
         /// <summary>
         /// Gets players asynchronously.
         /// </summary>
@@ -166,58 +168,24 @@ namespace SteamQuery
         /// </summary>
         public async Task<List<Rule>> GetRulesAsync() => RuleParser.Instance.Parse(await ExecuteQueryAsync(Rules));
 
-        private byte[] ExecuteQuery(byte[] query)
-        {
-            _udpClient.Send(query, query.Length);
-            var response = _udpClient.Receive(ref _ipEndPoint);
-
-            switch (query[0])
-            {
-                case 0x54: // Informations
-                    return response;
-                case 0x55: // Players
-                case 0x56: // Rules
-                    response[4] = query[0];
-                    break;
-                default:
-                    throw new UnexpectedByteException(query[0], 0x54, 0x55, 0x56);
-            }
-
-            var index = 5;
-            for (var i = 5; i <= 8; i++)
-            {
-                response[i] = response.ReadByte(ref index);
-            }
-
-            _udpClient.Send(response, response.Length);
-            return _udpClient.Receive(ref _ipEndPoint);
-        }
-
         private async Task<byte[]> ExecuteQueryAsync(byte[] query)
         {
-            await _udpClient.SendAsync(query, query.Length);
+            var s = await _udpClient.SendAsync(query, query.Length);
             var result = await _udpClient.ReceiveAsync();
 
             var response = result.Buffer;
 
-            switch (query[0])
+            switch (query[4])
             {
-                case 0x54: // Informations
+                case 0x54: // Information
                     return response;
                 case 0x55: // Players
                 case 0x56: // Rules
-                    response[4] = query[0];
+                    response[4] = query[4];
                     break;
                 default:
-                    throw new UnexpectedByteException(query[0], 0x54, 0x55, 0x56);
+                    throw new UnexpectedByteException(query[4], 0x54, 0x55, 0x56);
             }
-
-            var index = 5;
-            for (var i = 5; i <= 8; i++)
-            {
-                response[i] = response.ReadByte(ref index);
-            }
-
             await _udpClient.SendAsync(response, response.Length);
             var secondResult = await _udpClient.ReceiveAsync();
             return secondResult.Buffer;
