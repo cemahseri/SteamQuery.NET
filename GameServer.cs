@@ -14,17 +14,24 @@ namespace SteamQuery
     /// Server class holds information related to a game server in it.
     /// </summary>
     /// <remarks>Thread-safe.</remarks>
-    public sealed class Server : IDisposable
+    public sealed class GameServer : IDisposable
     {
-        private IPAddress _ip;
-
+        #region Payloads
         /// <summary>
-        /// Initialize without providing IP address nor port number. Be sure that you set them before connecting!
+        /// A2S_INFO payload.
         /// </summary>
-        public Server()
-        {
-        }
-
+        private static readonly byte[] Informations = { 0xFF, 0xFF, 0xFF, 0xFF, 0x54, 0x53, 0x6F, 0x75, 0x72, 0x63, 0x65, 0x20, 0x45, 0x6E, 0x67, 0x69, 0x6E, 0x65, 0x20, 0x51, 0x75, 0x65, 0x72, 0x79, 0x00 };
+        /// <summary>
+        /// A2S_PLAYER payload, server returns challenge.
+        /// </summary>
+        private static readonly byte[] Players = { 0xFF, 0xFF, 0xFF, 0xFF, 0x55, 0xFF, 0xFF, 0xFF, 0xFF };
+        /// <summary>
+        /// A2S_RULES payload, server returns challenge.
+        /// </summary>
+        private static readonly byte[] Rules = { 0xFF, 0xFF, 0xFF, 0xFF, 0x56, 0xFF, 0xFF, 0xFF, 0xFF };
+        #endregion
+        #region Properties
+        private IPAddress _ip;
         /// <summary>
         /// IP address of the server.
         /// </summary>
@@ -67,16 +74,20 @@ namespace SteamQuery
 
         private readonly UdpClient _udpClient;
         private IPEndPoint _ipEndPoint;
-
-        private static readonly byte[] Informations = { 0xFF, 0xFF, 0xFF, 0xFF, 0x54, 0x53, 0x6F, 0x75, 0x72, 0x63, 0x65, 0x20, 0x45, 0x6E, 0x67, 0x69, 0x6E, 0x65, 0x20, 0x51, 0x75, 0x65, 0x72, 0x79, 0x00 };
-        private static readonly byte[] Players = { 0xFF, 0xFF, 0xFF, 0xFF, 0x55, 0xFF, 0xFF, 0xFF, 0xFF };
-        private static readonly byte[] Rules = { 0xFF, 0xFF, 0xFF, 0xFF, 0x56, 0xFF, 0xFF, 0xFF, 0xFF };
+        #endregion
+        #region Constructors
+        /// <summary>
+        /// Initialize without providing IP address nor port number. Be sure that you set them before connecting!
+        /// </summary>
+        public GameServer()
+        {
+        }
 
         /// <summary>
         /// Initialize with given IP address and port number with a string parameter.
         /// </summary>
         /// <param name="endPoint">IP end point. Seperating IP address and port number with colon (:) required. Example: 127.0.0.1:1337</param>
-        public Server(string endPoint) : this(IpUtils.CreateIpEndPoint(endPoint))
+        public GameServer(string endPoint) : this(IPUtils.CreateIpEndPoint(endPoint))
         {
         }
 
@@ -85,7 +96,7 @@ namespace SteamQuery
         /// </summary>
         /// <param name="ip">IP address.</param>
         /// <param name="port">Port number.</param>
-        public Server(string ip, int port) : this(IpUtils.CreateIpEndPoint(ip, port))
+        public GameServer(string ip, int port) : this(IPUtils.CreateIpEndPoint(ip, port))
         {
         }
 
@@ -94,7 +105,7 @@ namespace SteamQuery
         /// </summary>
         /// <param name="ip">IP address.</param>
         /// <param name="port">Port number.</param>
-        public Server(IPAddress ip, int port) : this(new IPEndPoint(ip, port))
+        public GameServer(IPAddress ip, int port) : this(new IPEndPoint(ip, port))
         {
         }
 
@@ -102,7 +113,7 @@ namespace SteamQuery
         /// Initialize with given IP endpoint.
         /// </summary>
         /// <param name="ipEndPoint">IP endpoint.</param>
-        public Server(IPEndPoint ipEndPoint)
+        public GameServer(IPEndPoint ipEndPoint)
         {
             Ip = ipEndPoint.Address;
             Port = ipEndPoint.Port;
@@ -118,29 +129,8 @@ namespace SteamQuery
                 }
             };
         }
-
-        /// <summary>
-        /// Connects to the game server synchronously.
-        /// </summary>
-        /// <returns>true if successfully connected to the game server.</returns>
-        public bool Connect()
-        {
-            _udpClient.Connect(_ipEndPoint);
-
-            return true;
-        }
-
-        /// <summary>
-        /// Connects to the game server asynchronously.
-        /// </summary>
-        /// <returns>true if successfully connected to the game server.</returns>
-        public async Task<bool> ConnectAsync()
-        {
-            await _udpClient.Client.ConnectAsync(_ipEndPoint);
-
-            return true;
-        }
-        
+        #endregion
+        #region Gets
         //Task.Result blocks until Task has been completed.
         /// <summary>
         /// Gets informations synchronously.
@@ -167,13 +157,11 @@ namespace SteamQuery
         /// Gets rules asynchronously.
         /// </summary>
         public async Task<List<Rule>> GetRulesAsync() => RuleParser.Instance.Parse(await ExecuteQueryAsync(Rules));
-
+        #endregion
         private async Task<byte[]> ExecuteQueryAsync(byte[] query)
         {
-            var s = await _udpClient.SendAsync(query, query.Length);
-            var result = await _udpClient.ReceiveAsync();
-
-            var response = result.Buffer;
+            await _udpClient.SendAsync(query, query.Length);
+            var response = _udpClient.Receive(ref _ipEndPoint);
 
             switch (query[4])
             {
@@ -187,8 +175,28 @@ namespace SteamQuery
                     throw new UnexpectedByteException(query[4], 0x54, 0x55, 0x56);
             }
             await _udpClient.SendAsync(response, response.Length);
-            var secondResult = await _udpClient.ReceiveAsync();
-            return secondResult.Buffer;
+            return _udpClient.Receive(ref _ipEndPoint);
+        }
+        #region Connection
+        /// <summary>
+        /// Connects to the game server synchronously.
+        /// </summary>
+        /// <returns>true if successfully connected to the game server.</returns>
+        public bool Connect()
+        {
+            _udpClient.Connect(_ipEndPoint);
+
+            return true;
+        }
+        /// <summary>
+        /// Connects to the game server asynchronously.
+        /// </summary>
+        /// <returns>true if successfully connected to the game server.</returns>
+        public async Task<bool> ConnectAsync()
+        {
+            await _udpClient.Client.ConnectAsync(_ipEndPoint);
+
+            return true;
         }
 
         /// <summary>
@@ -197,11 +205,10 @@ namespace SteamQuery
         /// <returns>true if successfully disconnected from the game server.</returns>
         public bool Disconnect()
         {
-            _udpClient.Client.Disconnect(false);
-
+            _udpClient.Close();
             return true;
         }
-
+        #endregion
         /// <summary>
         /// Disposes the class.
         /// </summary>
@@ -210,5 +217,7 @@ namespace SteamQuery
             Disconnect();
             _udpClient.Dispose();
         }
+
+
     }
 }

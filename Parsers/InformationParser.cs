@@ -30,6 +30,7 @@ namespace SteamQuery.Parsers
             informations.Bots = input.ReadByte(ref index);
 
             var serverType = input.ReadByte(ref index);
+
             informations.ServerType = serverType switch
             {
                 0x64 => ServerType.Dedicated,
