@@ -1,0 +1,13 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net50</TargetFramework>
+    <OutputType>Library</OutputType>
+
+    <DebugType>none</DebugType>
+    <DebugSymbols>false</DebugSymbols>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+
+    <AssemblyName>SteamQuery.NET</AssemblyName>
+    <RootNamespace>SteamQuery</RootNamespace>
+  </PropertyGroup>
+</Project>
