@@ -1,3 +1,5 @@
 .vs/
-bin/
-obj/
+ExampleApplication/bin/
+ExampleApplication/obj/
+SteamQuery.NET/bin/
+SteamQuery.NET/obj/
