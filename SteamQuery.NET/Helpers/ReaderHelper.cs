@@ -17,7 +17,7 @@ namespace SteamQuery.Helpers
         {
             for (var nextNullIndex = index; nextNullIndex < source.Length; nextNullIndex++)
             {
-                if (source[nextNullIndex] == 0) // 0 is the null character. Strings in Steam queries are null-terminated.
+                if (source[nextNullIndex] == 0x00) // 0x00 is the byte value that which is correspond of null character. Strings in Steam queries are null-terminated.
                 {
                     var tempIndex = index;
                     index = nextNullIndex + 1;

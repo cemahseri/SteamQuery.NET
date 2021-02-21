@@ -34,20 +34,20 @@ namespace SteamQuery
             informations.ServerType = serverType switch
             {
                 0x64 => ServerType.Dedicated,
-                0x6c => ServerType.NonDedicated,
+                0x6C => ServerType.NonDedicated,
                 0x00 => ServerType.NonDedicated,
                 0x70 => ServerType.SourceTv,
-                _ => throw new UnexpectedByteException(serverType, 0x00, 0x64, 0x6c, 0x70)
+                _ => throw new UnexpectedByteException(serverType, 0x00, 0x64, 0x6C, 0x70)
             };
 
             var environment = response.ReadByte(ref index);
             informations.Environment = environment switch
             {
                 0x77 => EnvironmentType.Windows,
-                0x6c => EnvironmentType.Linux,
-                0x6d => EnvironmentType.Mac,
-                0x6f => EnvironmentType.Mac,
-                _ => throw new UnexpectedByteException(environment, 0x6c, 0x6d, 0x6f, 0x77)
+                0x6C => EnvironmentType.Linux,
+                0x6D => EnvironmentType.Mac,
+                0x6F => EnvironmentType.Mac,
+                _ => throw new UnexpectedByteException(environment, 0x6C, 0x6D, 0x6F, 0x77)
             };
 
             informations.Visible = response.ReadByte(ref index) == 0x00;
