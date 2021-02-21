@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net50</TargetFramework>
+    <OutputType>Exe</OutputType>
+
+    <DebugType>none</DebugType>
+    <DebugSymbols>false</DebugSymbols>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+
+    <AssemblyName>ExampleApplication</AssemblyName>
+    <RootNamespace>ExampleApplication</RootNamespace>
+    <OutputType>Exe</OutputType>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\SteamQuery.NET\SteamQuery.NET.csproj" />
+  </ItemGroup>
+</Project>
