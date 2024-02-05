@@ -1,9 +1,9 @@
-﻿namespace SteamQuery.Enums
+﻿namespace SteamQuery.Enums;
+
+public enum ServerType
 {
-    public enum ServerType
-    {
-        Dedicated,    // 0x64
-        NonDedicated, // 0x6c - 0x00
-        SourceTv      // 0x70
-    }
+    RagDollKungFu, // 0x00
+    Dedicated,     // 0x64
+    NonDedicated,  // 0x6c
+    SourceTv       // 0x70
 }

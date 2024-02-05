@@ -1,16 +1,11 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFramework>net50</TargetFramework>
     <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
 
-    <DebugType>none</DebugType>
-    <DebugSymbols>false</DebugSymbols>
-    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
-
-    <AssemblyName>ExampleApplication</AssemblyName>
-    <RootNamespace>ExampleApplication</RootNamespace>
-    <OutputType>Exe</OutputType>
+    <ImplicitUsings>enable</ImplicitUsings>
   </PropertyGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\SteamQuery.NET\SteamQuery.NET.csproj" />
   </ItemGroup>

@@ -1,17 +1,14 @@
-﻿using System;
+﻿namespace SteamQuery.Exceptions;
 
-namespace SteamQuery.Exceptions
+/// <summary>
+/// The exception that is thrown when port is invalid.
+/// </summary>
+public class InvalidPortException : Exception
 {
     /// <summary>
-    /// The exception that is thrown when port is invalid.
+    /// Initializes a new instance of the <see cref="InvalidPortException" /> class.
     /// </summary>
-    public class InvalidPortException : Exception
+    public InvalidPortException() : base("Port number was invalid.")
     {
-        /// <summary>
-        /// Initializes a new instance of the <see cref="InvalidPortException" /> class.
-        /// </summary>
-        public InvalidPortException() : base("Port number was invalid.")
-        {
-        }
     }
 }

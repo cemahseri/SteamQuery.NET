@@ -1,25 +1,24 @@
-﻿using System;
+﻿namespace SteamQuery.Models;
 
-namespace SteamQuery.Models
+public sealed record Player
 {
-    public sealed class Player
-    {
-        public byte Index { get; set; }
-        public string Name { get; set; }
-        public long Score { get; set; }
+    public required byte Index { get; init; }
 
-        private float _durationSecond;
-        public float DurationSecond
+    public required string Name { get; init; }
+
+    public required long Score { get; init; }
+
+    private readonly float _durationSeconds;
+    public required float DurationSeconds
+    {
+        get => _durationSeconds;
+        init
         {
-            get => _durationSecond;
-            set
-            {
-                _durationSecond = value;
-                DurationTimeSpan = TimeSpan.FromSeconds(value);
-                Duration = DurationTimeSpan.ToString(@"hh\:mm\:ss");
-            }
+            _durationSeconds = value;
+            DurationTimeSpan = TimeSpan.FromSeconds(value);
+            Duration = DurationTimeSpan.ToString(@"hh\:mm\:ss");
         }
-        public TimeSpan DurationTimeSpan { get; set; }
-        public string Duration { get; set; }
     }
+    public TimeSpan DurationTimeSpan { get; init; }
+    public string Duration { get; init; }
 }

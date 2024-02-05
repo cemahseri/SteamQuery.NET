@@ -1,9 +1,8 @@
-﻿namespace SteamQuery.Enums
+﻿namespace SteamQuery.Enums;
+
+public enum EnvironmentType
 {
-    public enum EnvironmentType
-    {
-        Windows, // 0x77
-        Linux,   // 0x6c
-        Mac      // 0x6d - 0x6f
-    }
+    Linux,   // 0x6c
+    Mac,     // 0x6d - 0x6f
+    Windows  // 0x77
 }

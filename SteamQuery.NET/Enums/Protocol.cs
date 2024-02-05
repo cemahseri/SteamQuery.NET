@@ -1,8 +1,7 @@
-﻿namespace SteamQuery.Enums
+﻿namespace SteamQuery.Enums;
+
+public enum Protocol
 {
-    public enum Protocol
-    {
-        Goldsource,
-        Source
-    }
+    Goldsource,
+    Source
 }

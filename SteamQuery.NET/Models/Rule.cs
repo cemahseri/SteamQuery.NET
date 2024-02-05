@@ -1,8 +1,8 @@
-﻿namespace SteamQuery.Models
+﻿namespace SteamQuery.Models;
+
+public sealed record Rule
 {
-    public sealed class Rule
-    {
-        public string Name { get; set; }
-        public string Value { get; set; }
-    }
+    public required string Name { get; init; }
+
+    public required string Value { get; init; }
 }
