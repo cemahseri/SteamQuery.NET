@@ -1,6 +1,6 @@
 ﻿using System.Net;
 using System.Net.Sockets;
-using SteamQuery.Exceptions;
+using SteamQuery.Enums;
 using SteamQuery.Helpers;
 using SteamQuery.Models;
 
@@ -41,9 +41,12 @@ public sealed class Server : IDisposable
     private readonly UdpClient _udpClient;
     private IPEndPoint _ipEndPoint;
 
-    private static readonly byte[] Informations = [ 0xFF, 0xFF, 0xFF, 0xFF, 0x54, 0x53, 0x6F, 0x75, 0x72, 0x63, 0x65, 0x20, 0x45, 0x6E, 0x67, 0x69, 0x6E, 0x65, 0x20, 0x51, 0x75, 0x65, 0x72, 0x79, 0x00 ];
-    private static readonly byte[] Players = [ 0xFF, 0xFF, 0xFF, 0xFF, 0x55, 0xFF, 0xFF, 0xFF, 0xFF ];
-    private static readonly byte[] Rules = [ 0xFF, 0xFF, 0xFF, 0xFF, 0x56, 0xFF, 0xFF, 0xFF, 0xFF ];
+    private static readonly byte[] PacketHeader     = [ 0xFF, 0xFF, 0xFF, 0xFF ];
+    private static readonly byte[] DefaultChallenge = PacketHeader;
+
+    private static readonly byte[] Informations = [ (byte)PayloadHeader.Informations, .."Source Engine Query\0"u8.ToArray() ];
+    private static readonly byte[] Players      = [ (byte)PayloadHeader.Players,      ..DefaultChallenge ];
+    private static readonly byte[] Rules        = [ (byte)PayloadHeader.Rules,        ..DefaultChallenge ];
 
     /// <summary>
     /// Initialize with given endpoint - in <see cref="string"/> type.
@@ -119,67 +122,50 @@ public sealed class Server : IDisposable
 
     // The main reason that I seperated synchronous method and the asynchronous method is, there is no benefit writing synchronous method then running it in a Task.
     // So, instead of that, I had seperated two methods and used asynchronous methods on the asynchronous method, such as UdpClient.SendAsync (instead of Send), UdpClient.ReceiveAsync (Receive), etc.
-    private byte[] ExecuteQuery(byte[] requestPayload)
+    private byte[] ExecuteQuery(byte[] request)
     {
-        _udpClient.Send(requestPayload);
+        _udpClient.Send((byte[])[ ..PacketHeader, ..request ]);
+
         var response = _udpClient.Receive(ref _ipEndPoint);
-
-        var requestPayloadHeader = requestPayload.ReadPayloadHeader();
-        switch (requestPayloadHeader)
+        if (response.ReadResponsePayloadHeader() == PayloadHeader.Challenge)
         {
-            case 0x54: // Informations
-                return response;
-            case 0x55: // Players
-            case 0x56: // Rules
-                response[4] = requestPayloadHeader;
-                break;
-            default:
-                throw new UnexpectedByteException(requestPayloadHeader, 0x54, 0x55, 0x56);
+            return ExecuteQuery(GetRequestWithChallenge(request, response));
         }
 
-        var index = 5;
-        for (var i = 5; i <= 8; i++)
-        {
-            response[i] = response.ReadByte(ref index);
-        }
-
-        _udpClient.Send(response);
-        return _udpClient.Receive(ref _ipEndPoint);
+        return response;
     }
 
     //TODO SendTimeout and ReceiveTimeout only works with synchronous calls. Make them work with asynchronous calls aswell.
-    private async Task<byte[]> ExecuteQueryAsync(byte[] requestPayload)
+    private async Task<byte[]> ExecuteQueryAsync(byte[] request)
     {
-        await _udpClient.SendAsync(requestPayload);
+        await _udpClient.SendAsync((byte[])[ ..PacketHeader, ..request ]);
+        
         var response = (await _udpClient.ReceiveAsync()).Buffer;
-
-        var requestPayloadHeader = requestPayload.ReadPayloadHeader();
-        switch (requestPayloadHeader)
+        if (response.ReadResponsePayloadHeader() == PayloadHeader.Challenge)
         {
-            case 0x54: // Informations
-                return response;
-            case 0x55: // Players
-            case 0x56: // Rules
-                response[4] = requestPayloadHeader;
-                break;
-            default:
-                throw new UnexpectedByteException(requestPayloadHeader, 0x54, 0x55, 0x56);
+            return await ExecuteQueryAsync(GetRequestWithChallenge(request, response));
         }
 
-        var index = 5;
-        for (var i = 5; i <= 8; i++)
-        {
-            response[i] = response.ReadByte(ref index);
-        }
+        return response;
+    }
 
-        await _udpClient.SendAsync(response);
-        return (await _udpClient.ReceiveAsync()).Buffer;
+    private byte[] GetRequestWithChallenge(byte[] request, IEnumerable<byte> response)
+    {
+        return request.ReadRequestPayloadHeader() switch
+        {
+            PayloadHeader.Informations => [ ..request, ..response.TakeLast(4) ],
+            PayloadHeader.Players
+                or PayloadHeader.Rules => [ request[0], ..response.TakeLast(4) ]
+        };
     }
 
     /// <summary>
     /// Closes socket.
     /// </summary>
-    public void Close() => _udpClient.Close();
+    public void Close()
+    {
+        _udpClient.Close();
+    }
 
     /// <summary>
     /// Disposes the class.

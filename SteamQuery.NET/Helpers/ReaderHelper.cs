@@ -1,14 +1,18 @@
 ﻿using System.Text;
+using SteamQuery.Enums;
 
 namespace SteamQuery.Helpers;
 
-internal static class ByteReaderHelper
+internal static class ReaderHelper
 {
     internal static int ReadPacketHeader(this byte[] source)
         => BitConverter.ToInt32(source, 0);
 
-    internal static byte ReadPayloadHeader(this byte[] source)
-        => source[4];
+    internal static PayloadHeader ReadRequestPayloadHeader(this byte[] source)
+        => (PayloadHeader)source[0];
+
+    internal static PayloadHeader ReadResponsePayloadHeader(this byte[] source)
+        => (PayloadHeader)source[4];
 
     internal static byte ReadByte(this byte[] source, ref int index)
         => source[index++];
