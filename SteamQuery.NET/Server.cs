@@ -44,9 +44,9 @@ public sealed class Server : IDisposable
     private static readonly byte[] PacketHeader     = [ 0xFF, 0xFF, 0xFF, 0xFF ];
     private static readonly byte[] DefaultChallenge = PacketHeader;
 
-    private static readonly byte[] Informations = [ (byte)PayloadHeader.Informations, .."Source Engine Query\0"u8.ToArray() ];
-    private static readonly byte[] Players      = [ (byte)PayloadHeader.Players,      ..DefaultChallenge ];
-    private static readonly byte[] Rules        = [ (byte)PayloadHeader.Rules,        ..DefaultChallenge ];
+    private static readonly byte[] Informations = [ (byte)PayloadIdentifier.Informations, .."Source Engine Query\0"u8.ToArray() ];
+    private static readonly byte[] Players      = [ (byte)PayloadIdentifier.Players,      ..DefaultChallenge ];
+    private static readonly byte[] Rules        = [ (byte)PayloadIdentifier.Rules,        ..DefaultChallenge ];
 
     /// <summary>
     /// Initialize with given endpoint - in <see cref="string"/> type.
@@ -127,7 +127,20 @@ public sealed class Server : IDisposable
         _udpClient.Send((byte[])[ ..PacketHeader, ..request ]);
 
         var response = _udpClient.Receive(ref _ipEndPoint);
-        if (response.ReadResponsePayloadHeader() == PayloadHeader.Challenge)
+
+        var packetHeader = response.ReadPacketIdentifier();
+        if (packetHeader == PacketIdentifier.Split)
+        {
+            throw new NotImplementedException("Split packets are not implemented yet.");
+        }
+
+        var responsePayloadHeader = response.ReadResponsePayloadIdentifier();
+        if (responsePayloadHeader == PayloadIdentifier.OldGoldSource)
+        {
+            throw new NotImplementedException("Older and pre-Steam GoldSource servers are not implemented yet.");
+        }
+        
+        if (responsePayloadHeader == PayloadIdentifier.Challenge)
         {
             return ExecuteQuery(GetRequestWithChallenge(request, response));
         }
@@ -141,7 +154,49 @@ public sealed class Server : IDisposable
         await _udpClient.SendAsync((byte[])[ ..PacketHeader, ..request ]);
         
         var response = (await _udpClient.ReceiveAsync()).Buffer;
-        if (response.ReadResponsePayloadHeader() == PayloadHeader.Challenge)
+
+        var packetHeader = response.ReadPacketIdentifier();
+        if (packetHeader == PacketIdentifier.Split)
+        {
+            var multiPacketHeader = response.ReadMultiPacketHeader();
+
+            if (!multiPacketHeader.IsGoldSourceServer)
+            {
+                if (multiPacketHeader.IsCompressed)
+                {
+                    throw new NotImplementedException("Compressed packets not implemented yet. Please report server IP address and port, so I can implement it.");
+                }
+            }
+
+            var payloadIndex = multiPacketHeader.IsGoldSourceServer switch
+            {
+                true => 9,
+                false when !multiPacketHeader.IsCompressed => 12,
+                false when multiPacketHeader.IsCompressed => 20
+            };
+
+            // We do not need the packet header. We already processed it and won't need again. So, just trim it.
+            response = response[payloadIndex..];
+
+            var remainingPackets = new List<byte[]>(multiPacketHeader.TotalPackets);
+
+            for (var i = 1; i < multiPacketHeader.TotalPackets; i++)
+            {
+                remainingPackets.Add((await _udpClient.ReceiveAsync()).Buffer);
+            }
+
+            // Combine the first response and remaining packets - of course after ordering it by packet number and trimming the packet header, just like above.
+            return [ ..response, ..remainingPackets.OrderBy(p => p.ReadMultiPacketHeader().PacketNumber).SelectMany(p => p[payloadIndex..]).ToArray() ];
+        }
+
+        var responsePayloadHeader = response.ReadResponsePayloadIdentifier();
+        if (responsePayloadHeader == PayloadIdentifier.OldGoldSource)
+        {
+            Console.WriteLine(string.Join(" ", response.Select(b => b.ToString("X2"))));
+            throw new NotImplementedException("Older and pre-Steam GoldSource servers are not implemented yet.");
+        }
+
+        if (responsePayloadHeader == PayloadIdentifier.Challenge)
         {
             return await ExecuteQueryAsync(GetRequestWithChallenge(request, response));
         }
@@ -149,13 +204,13 @@ public sealed class Server : IDisposable
         return response;
     }
 
-    private byte[] GetRequestWithChallenge(byte[] request, IEnumerable<byte> response)
+    private static byte[] GetRequestWithChallenge(byte[] request, IEnumerable<byte> response)
     {
-        return request.ReadRequestPayloadHeader() switch
+        return request.ReadRequestPayloadIdentifier() switch
         {
-            PayloadHeader.Informations => [ ..request, ..response.TakeLast(4) ],
-            PayloadHeader.Players
-                or PayloadHeader.Rules => [ request[0], ..response.TakeLast(4) ]
+            PayloadIdentifier.Informations => [ ..request, ..response.TakeLast(4) ],
+            PayloadIdentifier.Players
+                or PayloadIdentifier.Rules => [ request[0], ..response.TakeLast(4) ]
         };
     }
 
