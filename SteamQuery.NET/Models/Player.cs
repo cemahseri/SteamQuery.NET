@@ -2,25 +2,25 @@
 
 public sealed record Player
 {
-    public required byte Index { get; init; }
+    public byte Index { get; internal set; }
 
-    public required string Name { get; init; }
+    public string Name { get; internal set; }
 
-    public required long Score { get; init; }
+    public long Score { get; internal set; }
 
-    private readonly float _durationSeconds;
-    public required float DurationSeconds
+    private float _durationSeconds;
+    public float DurationSeconds
     {
         get => _durationSeconds;
-        init
+        internal set
         {
             _durationSeconds = value;
             DurationTimeSpan = TimeSpan.FromSeconds(value);
             Duration = DurationTimeSpan.ToString(@"hh\:mm\:ss");
         }
     }
-    public TimeSpan DurationTimeSpan { get; init; }
-    public string Duration { get; init; }
+    public TimeSpan DurationTimeSpan { get; internal set; }
+    public string Duration { get; internal set; }
 
     public int TheShipDeaths { get; internal set; }
     public int TheShipMoney { get; internal set; }

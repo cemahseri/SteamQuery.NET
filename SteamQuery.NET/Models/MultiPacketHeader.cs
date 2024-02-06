@@ -2,7 +2,7 @@
 
 internal sealed record MultiPacketHeader
 {
-    internal required bool IsGoldSourceServer { get; init; }
+    internal bool IsGoldSourceServer { get; set; }
 
     internal int Id { get; set; }
 

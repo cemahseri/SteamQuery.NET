@@ -1,15 +1,19 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>Library</OutputType>
-    <TargetFramework>net8.0</TargetFramework>
+    <TargetFrameworks>net8.0;netstandard2.0</TargetFrameworks>
 
     <ImplicitUsings>enable</ImplicitUsings>
 
-    <RootNamespace>SteamQuery</RootNamespace>
+    <LangVersion>latest</LangVersion>
 
+    <RootNamespace>SteamQuery</RootNamespace>
+  </PropertyGroup>
+
+  <PropertyGroup>
     <PackageId>SteamQuery.NET</PackageId>
     <Description>Yet another Steam server queries .NET wrapper.</Description>
-    <Version>1.0.0.0</Version>
+    <Version>1.0.1</Version>
     <Authors>cemahseri</Authors>
 
     <RepositoryUrl>https://github.com/cemahseri/SteamQuery.NET</RepositoryUrl>
@@ -27,6 +31,11 @@
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="ConfigureAwait.Fody" Version="3.3.2" />
+    <PackageReference Include="Fody" Version="6.8.0">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
     <PackageReference Include="SharpZipLib" Version="1.4.2" />
   </ItemGroup>
 </Project>

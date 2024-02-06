@@ -2,7 +2,7 @@
 
 public sealed record Rule
 {
-    public required string Name { get; init; }
+    public string Name { get; internal set; }
 
-    public required string Value { get; init; }
+    public string Value { get; internal set; }
 }

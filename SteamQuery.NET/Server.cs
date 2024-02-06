@@ -11,6 +11,7 @@ namespace SteamQuery;
 /// Server class holds information related to a game server in it.
 /// </summary>
 /// <remarks>Thread-safe.</remarks>
+[Fody.ConfigureAwait(false)]
 public sealed class Server : IDisposable
 {
     /// <summary>
@@ -112,22 +113,22 @@ public sealed class Server : IDisposable
     /// <summary>
     /// Gets information asynchronously.
     /// </summary>
-    public async Task<Informations> GetInformationsAsync() => ResponseReader.ParseInformation(await ExecuteQueryAsync(Informations));
+    public async Task<Informations> GetInformationsAsync(CancellationToken cancellationToken = default) => ResponseReader.ParseInformation(await ExecuteQueryAsync(Informations, cancellationToken));
     /// <summary>
     /// Gets players asynchronously.
     /// </summary>
-    public async Task<List<Player>> GetPlayersAsync() => ResponseReader.ParsePlayers(await ExecuteQueryAsync(Players));
+    public async Task<List<Player>> GetPlayersAsync(CancellationToken cancellationToken = default) => ResponseReader.ParsePlayers(await ExecuteQueryAsync(Players, cancellationToken));
     /// <summary>
     /// Gets rules asynchronously.
     /// </summary>
-    public async Task<List<Rule>> GetRulesAsync() => ResponseReader.ParseRules(await ExecuteQueryAsync(Rules));
+    public async Task<List<Rule>> GetRulesAsync(CancellationToken cancellationToken = default) => ResponseReader.ParseRules(await ExecuteQueryAsync(Rules, cancellationToken));
 
     // The main reason that I seperated synchronous method and the asynchronous method is, there is no benefit writing synchronous method then running it in a Task.
     // So, instead of that, I had seperated two methods and used asynchronous methods on the asynchronous method, such as UdpClient.SendAsync (instead of Send), UdpClient.ReceiveAsync (Receive), etc.
     // For comments, check the asynchronous method.
     private byte[] ExecuteQuery(byte[] request)
     {
-        _udpClient.Send([ ..PacketHeader, ..request ]);
+        _udpClient.Send([.. PacketHeader, .. request], PacketHeader.Length + request.Length);
 
         var response = _udpClient.Receive(ref _ipEndPoint);
 
@@ -146,12 +147,12 @@ public sealed class Server : IDisposable
 
             var payloadIndex = multiPacketHeader.IsGoldSourceServer switch
             {
-                true => 9,
+                false when multiPacketHeader.IsCompressed => 20,
                 false when !multiPacketHeader.IsCompressed => 12,
-                false when multiPacketHeader.IsCompressed => 20
+                true => 9
             };
 
-            response = response[payloadIndex..];
+            response = response.Skip(payloadIndex).ToArray();
 
             var remainingPackets = new List<byte[]>(multiPacketHeader.TotalPackets);
 
@@ -163,7 +164,7 @@ public sealed class Server : IDisposable
             response =
             [
                 ..response,
-                ..remainingPackets.OrderBy(p => p.ReadMultiPacketHeader().PacketNumber).SelectMany(p => p[payloadIndex..]).ToArray()
+                ..remainingPackets.OrderBy(p => p.ReadMultiPacketHeader().PacketNumber).SelectMany(p => p.Skip(payloadIndex)).ToArray()
             ];
 
             if (multiPacketHeader.IsCompressed)
@@ -190,7 +191,7 @@ public sealed class Server : IDisposable
             return ExecuteQuery(
             [
                 ..request.ReadRequestPayloadIdentifier() == PayloadIdentifier.Informations ? request : [ request[0] ],
-                ..response.TakeLast(4)
+                ..response.Skip(response.Length - 4)
             ]);
         }
 
@@ -198,11 +199,19 @@ public sealed class Server : IDisposable
     }
 
     //TODO SendTimeout and ReceiveTimeout only works with synchronous calls. Make them work with asynchronous calls aswell.
-    private async Task<byte[]> ExecuteQueryAsync(byte[] request)
+    private async Task<byte[]> ExecuteQueryAsync(byte[] request, CancellationToken cancellationToken)
     {
-        await _udpClient.SendAsync((byte[])[ ..PacketHeader, ..request ]);
-        
+#if NETCOREAPP2_0_OR_GREATER
+        await _udpClient.SendAsync((byte[])[ ..PacketHeader, ..request ], cancellationToken);
+#else
+        await _udpClient.SendAsync((byte[])[ ..PacketHeader, ..request ], PacketHeader.Length + request.Length);
+#endif
+
+#if NETCOREAPP2_0_OR_GREATER
+        var response = (await _udpClient.ReceiveAsync(cancellationToken)).Buffer;
+#else
         var response = (await _udpClient.ReceiveAsync()).Buffer;
+#endif
 
         var packetHeader = response.ReadPacketIdentifier();
         if (packetHeader == PacketIdentifier.Split)
@@ -219,36 +228,42 @@ public sealed class Server : IDisposable
 
             var payloadIndex = multiPacketHeader.IsGoldSourceServer switch
             {
-                // Packet Header(4) + ID(4) + Packet Number(1)
-                true => 9,
+                // Packet Header(4) + ID(4) + Total Packets(1) + Packet Number(1) + Maximum Packet Size(2) + Decompressed Size(4) + CRC32 Checksum(4)
+                false when multiPacketHeader.IsCompressed => 20,
                 // Packet Header(4) + ID(4) + Total Packets(1) + Packet Number(1) + Maximum Packet Size(2)
                 false when !multiPacketHeader.IsCompressed => 12,
-                // Packet Header(4) + ID(4) + Total Packets(1) + Packet Number(1) + Maximum Packet Size(2) + Decompressed Size(4) + CRC32 Checksum(4)
-                false when multiPacketHeader.IsCompressed => 20
+                // Packet Header(4) + ID(4) + Packet Number(1)
+                true => 9
             };
 
             // We do not need the packet header. We already processed it and won't need again. So, just trim it.
-            response = response[payloadIndex..];
+            response = response.Skip(payloadIndex).ToArray();
 
             var remainingPackets = new List<byte[]>(multiPacketHeader.TotalPackets);
 
             for (var i = 1; i < multiPacketHeader.TotalPackets; i++)
             {
+                cancellationToken.ThrowIfCancellationRequested();
+
+#if NETCOREAPP2_0_OR_GREATER
+                remainingPackets.Add((await _udpClient.ReceiveAsync(cancellationToken)).Buffer);
+#else
                 remainingPackets.Add((await _udpClient.ReceiveAsync()).Buffer);
+#endif
             }
 
             // Combine the first response and remaining packets - of course after ordering it by packet number and trimming the packet header, just like above.
             response =
             [
                 ..response,
-                ..remainingPackets.OrderBy(p => p.ReadMultiPacketHeader().PacketNumber).SelectMany(p => p[payloadIndex..]).ToArray()
+                ..remainingPackets.OrderBy(p => p.ReadMultiPacketHeader().PacketNumber).SelectMany(p => p.Skip(payloadIndex)).ToArray()
             ];
 
             //TODO This should work but first, test it. Also check uncompressed size and CRC32 checksum.
             if (multiPacketHeader.IsCompressed)
             {
-                await using var compressedMemoryStream = new MemoryStream(response); // Probably, I will need to strip the packet header before decompressing it.
-                await using var decompressedMemoryStream = new MemoryStream();
+                using var compressedMemoryStream = new MemoryStream(response); // Probably, I will need to strip the packet header before decompressing it.
+                using var decompressedMemoryStream = new MemoryStream();
 
                 BZip2.Decompress(compressedMemoryStream, decompressedMemoryStream, false);
 
@@ -269,8 +284,8 @@ public sealed class Server : IDisposable
             return await ExecuteQueryAsync(
             [
                 ..request.ReadRequestPayloadIdentifier() == PayloadIdentifier.Informations ? request : [ request[0] ],
-                ..response.TakeLast(4)
-            ]);
+                ..response.Skip(response.Length - 4)
+            ], cancellationToken);
         }
 
         return response;

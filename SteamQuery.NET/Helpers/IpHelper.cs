@@ -47,7 +47,7 @@ internal static class IpHelper
 
         if (!IPAddress.TryParse(hostNameOrIpAddress, out var ipAddress)) // If it's not a valid IP address, then it might be a hostname like: play.somehostname.com
         {
-            ipAddress = Dns.GetHostAddresses(hostNameOrIpAddress, AddressFamily.InterNetwork).FirstOrDefault();
+            ipAddress = Dns.GetHostAddresses(hostNameOrIpAddress).FirstOrDefault();
             
             if (ipAddress == default)
             {
