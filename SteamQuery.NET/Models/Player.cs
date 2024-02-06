@@ -21,4 +21,7 @@ public sealed record Player
     }
     public TimeSpan DurationTimeSpan { get; init; }
     public string Duration { get; init; }
+
+    public int TheShipDeaths { get; internal set; }
+    public int TheShipMoney { get; internal set; }
 }

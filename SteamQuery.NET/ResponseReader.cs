@@ -52,7 +52,14 @@ public static class ResponseReader
 
         informations.Visible = response.ReadByte(ref index) == 0x00;
         informations.VacSecured = response.ReadByte(ref index) == 0x01;
-        // The Ship is missing here for now. Will add later.
+
+        if (informations.GameId == 2400) // 2400 is The Ship: Murder Party's application ID in Steam.
+        {
+            informations.TheShipGameMode = (TheShipGameMode)response.ReadByte(ref index);
+            informations.TheShipWitnesses = response.ReadByte(ref index);
+            informations.TheShipDuration = response.ReadByte(ref index);
+        }
+
         informations.Version = response.ReadString(ref index);
 
         if (response.Length - index > 0) // If we have the extra flags.
@@ -105,6 +112,15 @@ public static class ResponseReader
                 Score = response.ReadInt(ref index),
                 DurationSeconds = response.ReadFloat(ref index)
             });
+        }
+
+        if (index < response.Length)
+        {
+            foreach (var player in players)
+            {
+                player.TheShipDeaths = response.ReadInt(ref index);
+                player.TheShipMoney = response.ReadInt(ref index);
+            }
         }
 
         return players;

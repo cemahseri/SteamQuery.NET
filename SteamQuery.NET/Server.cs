@@ -1,5 +1,6 @@
 ﻿using System.Net;
 using System.Net.Sockets;
+using ICSharpCode.SharpZipLib.BZip2;
 using SteamQuery.Enums;
 using SteamQuery.Helpers;
 using SteamQuery.Models;
@@ -30,7 +31,8 @@ public sealed class Server : IDisposable
     /// <summary>
     /// Gets or sets a value that specifies the amount of time in milliseconds, after which a connection or query call will time out.
     /// </summary>
-    /// <returns>The time-out value, in milliseconds. If you set the property with a value between 1 and 499, the value will be changed to 500 - because how it is implemented in <see cref="Socket"/> class. The default value is 0, which indicates an infinite time-out period. Specifying -1 also indicates an infinite time-out period.</returns>
+    /// <returns>The time-out value, in milliseconds. If you set the property with a value between 1 and 499, the value will be changed to 500 - because how it is implemented in <see cref="Socket"/> class.
+    /// <para>The default value is 0, which indicates an infinite time-out period. Specifying -1 also indicates an infinite time-out period.</para></returns>
     public int SendTimeout { get; set; } = 5000;
     /// <summary>
     /// Gets or sets a value that specifies the amount of time in milliseconds, after which a query receive call will time out.
@@ -122,16 +124,59 @@ public sealed class Server : IDisposable
 
     // The main reason that I seperated synchronous method and the asynchronous method is, there is no benefit writing synchronous method then running it in a Task.
     // So, instead of that, I had seperated two methods and used asynchronous methods on the asynchronous method, such as UdpClient.SendAsync (instead of Send), UdpClient.ReceiveAsync (Receive), etc.
+    // For comments, check the asynchronous method.
     private byte[] ExecuteQuery(byte[] request)
     {
-        _udpClient.Send((byte[])[ ..PacketHeader, ..request ]);
+        _udpClient.Send([ ..PacketHeader, ..request ]);
 
         var response = _udpClient.Receive(ref _ipEndPoint);
 
         var packetHeader = response.ReadPacketIdentifier();
         if (packetHeader == PacketIdentifier.Split)
         {
-            throw new NotImplementedException("Split packets are not implemented yet.");
+            var multiPacketHeader = response.ReadMultiPacketHeader();
+
+            if (!multiPacketHeader.IsGoldSourceServer)
+            {
+                if (multiPacketHeader.IsCompressed)
+                {
+                    throw new NotImplementedException("Compressed packets not implemented yet. Please report server IP address and port, so I can test it.");
+                }
+            }
+
+            var payloadIndex = multiPacketHeader.IsGoldSourceServer switch
+            {
+                true => 9,
+                false when !multiPacketHeader.IsCompressed => 12,
+                false when multiPacketHeader.IsCompressed => 20
+            };
+
+            response = response[payloadIndex..];
+
+            var remainingPackets = new List<byte[]>(multiPacketHeader.TotalPackets);
+
+            for (var i = 1; i < multiPacketHeader.TotalPackets; i++)
+            {
+                remainingPackets.Add(_udpClient.Receive(ref _ipEndPoint));
+            }
+
+            response =
+            [
+                ..response,
+                ..remainingPackets.OrderBy(p => p.ReadMultiPacketHeader().PacketNumber).SelectMany(p => p[payloadIndex..]).ToArray()
+            ];
+
+            if (multiPacketHeader.IsCompressed)
+            {
+                using var compressedMemoryStream = new MemoryStream(response);
+                using var decompressedMemoryStream = new MemoryStream();
+
+                BZip2.Decompress(compressedMemoryStream, decompressedMemoryStream, false);
+
+                response = decompressedMemoryStream.ToArray();
+            }
+
+            return response;
         }
 
         var responsePayloadHeader = response.ReadResponsePayloadIdentifier();
@@ -139,10 +184,14 @@ public sealed class Server : IDisposable
         {
             throw new NotImplementedException("Older and pre-Steam GoldSource servers are not implemented yet.");
         }
-        
+
         if (responsePayloadHeader == PayloadIdentifier.Challenge)
         {
-            return ExecuteQuery(GetRequestWithChallenge(request, response));
+            return ExecuteQuery(
+            [
+                ..request.ReadRequestPayloadIdentifier() == PayloadIdentifier.Informations ? request : [ request[0] ],
+                ..response.TakeLast(4)
+            ]);
         }
 
         return response;
@@ -164,14 +213,17 @@ public sealed class Server : IDisposable
             {
                 if (multiPacketHeader.IsCompressed)
                 {
-                    throw new NotImplementedException("Compressed packets not implemented yet. Please report server IP address and port, so I can implement it.");
+                    throw new NotImplementedException("Compressed packets not implemented yet. Please report server IP address and port, so I can test it.");
                 }
             }
 
             var payloadIndex = multiPacketHeader.IsGoldSourceServer switch
             {
+                // Packet Header(4) + ID(4) + Packet Number(1)
                 true => 9,
+                // Packet Header(4) + ID(4) + Total Packets(1) + Packet Number(1) + Maximum Packet Size(2)
                 false when !multiPacketHeader.IsCompressed => 12,
+                // Packet Header(4) + ID(4) + Total Packets(1) + Packet Number(1) + Maximum Packet Size(2) + Decompressed Size(4) + CRC32 Checksum(4)
                 false when multiPacketHeader.IsCompressed => 20
             };
 
@@ -186,32 +238,42 @@ public sealed class Server : IDisposable
             }
 
             // Combine the first response and remaining packets - of course after ordering it by packet number and trimming the packet header, just like above.
-            return [ ..response, ..remainingPackets.OrderBy(p => p.ReadMultiPacketHeader().PacketNumber).SelectMany(p => p[payloadIndex..]).ToArray() ];
+            response =
+            [
+                ..response,
+                ..remainingPackets.OrderBy(p => p.ReadMultiPacketHeader().PacketNumber).SelectMany(p => p[payloadIndex..]).ToArray()
+            ];
+
+            //TODO This should work but first, test it. Also check uncompressed size and CRC32 checksum.
+            if (multiPacketHeader.IsCompressed)
+            {
+                await using var compressedMemoryStream = new MemoryStream(response); // Probably, I will need to strip the packet header before decompressing it.
+                await using var decompressedMemoryStream = new MemoryStream();
+
+                BZip2.Decompress(compressedMemoryStream, decompressedMemoryStream, false);
+
+                response = decompressedMemoryStream.ToArray();
+            }
+
+            return response;
         }
 
         var responsePayloadHeader = response.ReadResponsePayloadIdentifier();
         if (responsePayloadHeader == PayloadIdentifier.OldGoldSource)
         {
-            Console.WriteLine(string.Join(" ", response.Select(b => b.ToString("X2"))));
             throw new NotImplementedException("Older and pre-Steam GoldSource servers are not implemented yet.");
         }
 
         if (responsePayloadHeader == PayloadIdentifier.Challenge)
         {
-            return await ExecuteQueryAsync(GetRequestWithChallenge(request, response));
+            return await ExecuteQueryAsync(
+            [
+                ..request.ReadRequestPayloadIdentifier() == PayloadIdentifier.Informations ? request : [ request[0] ],
+                ..response.TakeLast(4)
+            ]);
         }
 
         return response;
-    }
-
-    private static byte[] GetRequestWithChallenge(byte[] request, IEnumerable<byte> response)
-    {
-        return request.ReadRequestPayloadIdentifier() switch
-        {
-            PayloadIdentifier.Informations => [ ..request, ..response.TakeLast(4) ],
-            PayloadIdentifier.Players
-                or PayloadIdentifier.Rules => [ request[0], ..response.TakeLast(4) ]
-        };
     }
 
     /// <summary>

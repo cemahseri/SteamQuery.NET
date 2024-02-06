@@ -4,7 +4,7 @@ using SteamQuery;
 Console.OutputEncoding = Encoding.UTF8;
 
 // Pick a server from: https://www.gametracker.com/search/cs/
-using var server = new Server("213.238.173.11:27015");
+using var server = new Server("127.0.0.1:27015");
 
 var informations = await server.GetInformationsAsync();
 
@@ -62,6 +62,8 @@ if (hasExtraDataFlag)
 Console.WriteLine();
 
 var players = await server.GetPlayersAsync();
+
+Console.WriteLine($"Online Players: {players.Count}/{informations.MaxPlayers}");
 
 foreach (var player in players)
 {
