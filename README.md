@@ -9,6 +9,7 @@ Yet another [Steam server queries](https://developer.valvesoftware.com/wiki/Serv
 - [x] Split packets.
 - [ ] bzip2 decompression. *(It's kind of implemented. I just couldn't find any server that uses bzip2 compression. If you know any, just hit me up. I'd appreciate it.)*
 - [ ] Add CancellationToken as parameter to asynchronous methods.
+- [ ] Use ConfigureAwait Fody weaver.
 - [ ] Target older frameworks.
 
 # Example
