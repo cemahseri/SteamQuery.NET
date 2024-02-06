@@ -1,5 +1,5 @@
-[![NuGet Downloads (SteamQuery.NET)](https://img.shields.io/nuget/dt/SteamQuery.NET?style=for-the-badge&color=D800FF)](https://www.nuget.org/packages/SteamQuery.NET)
 [![NuGet Version (SteamQuery.NET)](https://img.shields.io/nuget/v/SteamQuery.NET?style=for-the-badge&color=D800FF)](https://www.nuget.org/packages/SteamQuery.NET)
+[![NuGet Downloads (SteamQuery.NET)](https://img.shields.io/nuget/dt/SteamQuery.NET?style=for-the-badge&color=D800FF)](https://www.nuget.org/packages/SteamQuery.NET)
 
 # SteamQuery.NET
 Yet another [Steam server queries](https://developer.valvesoftware.com/wiki/Server_queries) .NET wrapper.
