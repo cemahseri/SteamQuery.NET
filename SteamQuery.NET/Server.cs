@@ -11,7 +11,6 @@ namespace SteamQuery;
 /// Server class holds information related to a game server in it.
 /// </summary>
 /// <remarks>Thread-safe.</remarks>
-[Fody.ConfigureAwait(false)]
 public sealed class Server : IDisposable
 {
     /// <summary>
@@ -47,9 +46,9 @@ public sealed class Server : IDisposable
     private static readonly byte[] PacketHeader     = [ 0xFF, 0xFF, 0xFF, 0xFF ];
     private static readonly byte[] DefaultChallenge = PacketHeader;
 
-    private static readonly byte[] Informations = [ (byte)PayloadIdentifier.Informations, .."Source Engine Query\0"u8.ToArray() ];
-    private static readonly byte[] Players      = [ (byte)PayloadIdentifier.Players,      ..DefaultChallenge ];
-    private static readonly byte[] Rules        = [ (byte)PayloadIdentifier.Rules,        ..DefaultChallenge ];
+    private static readonly byte[] InformationRequest = [ (byte)PayloadIdentifier.Information, .."Source Engine Query\0"u8.ToArray() ];
+    private static readonly byte[] PlayersRequest     = [ (byte)PayloadIdentifier.Players,     ..DefaultChallenge ];
+    private static readonly byte[] RulesRequest       = [ (byte)PayloadIdentifier.Rules,       ..DefaultChallenge ];
 
     /// <summary>
     /// Initialize with given endpoint - in <see cref="string"/> type.
@@ -100,35 +99,35 @@ public sealed class Server : IDisposable
     /// <summary>
     /// Gets information synchronously.
     /// </summary>
-    public Informations GetInformations() => ResponseReader.ParseInformation(ExecuteQuery(Informations));
+    public Information GetInformation() => ResponseReader.ParseInformation(ExecuteQuery(InformationRequest));
     /// <summary>
     /// Gets players synchronously.
     /// </summary>
-    public List<Player> GetPlayers() => ResponseReader.ParsePlayers(ExecuteQuery(Players));
+    public List<Player> GetPlayers() => ResponseReader.ParsePlayers(ExecuteQuery(PlayersRequest));
     /// <summary>
     /// Gets rules synchronously.
     /// </summary>
-    public List<Rule> GetRules() => ResponseReader.ParseRules(ExecuteQuery(Rules));
+    public List<Rule> GetRules() => ResponseReader.ParseRules(ExecuteQuery(RulesRequest));
 
     /// <summary>
     /// Gets information asynchronously.
     /// </summary>
-    public async Task<Informations> GetInformationsAsync(CancellationToken cancellationToken = default) => ResponseReader.ParseInformation(await ExecuteQueryAsync(Informations, cancellationToken));
+    public async Task<Information> GetInformationAsync(CancellationToken cancellationToken = default) => ResponseReader.ParseInformation(await ExecuteQueryAsync(InformationRequest, cancellationToken));
     /// <summary>
     /// Gets players asynchronously.
     /// </summary>
-    public async Task<List<Player>> GetPlayersAsync(CancellationToken cancellationToken = default) => ResponseReader.ParsePlayers(await ExecuteQueryAsync(Players, cancellationToken));
+    public async Task<List<Player>> GetPlayersAsync(CancellationToken cancellationToken = default) => ResponseReader.ParsePlayers(await ExecuteQueryAsync(PlayersRequest, cancellationToken));
     /// <summary>
     /// Gets rules asynchronously.
     /// </summary>
-    public async Task<List<Rule>> GetRulesAsync(CancellationToken cancellationToken = default) => ResponseReader.ParseRules(await ExecuteQueryAsync(Rules, cancellationToken));
+    public async Task<List<Rule>> GetRulesAsync(CancellationToken cancellationToken = default) => ResponseReader.ParseRules(await ExecuteQueryAsync(RulesRequest, cancellationToken));
 
     // The main reason that I seperated synchronous method and the asynchronous method is, there is no benefit writing synchronous method then running it in a Task.
     // So, instead of that, I had seperated two methods and used asynchronous methods on the asynchronous method, such as UdpClient.SendAsync (instead of Send), UdpClient.ReceiveAsync (Receive), etc.
     // For comments, check the asynchronous method.
     private byte[] ExecuteQuery(byte[] request)
     {
-        _udpClient.Send([.. PacketHeader, .. request], PacketHeader.Length + request.Length);
+        _udpClient.Send([ ..PacketHeader, ..request ], PacketHeader.Length + request.Length);
 
         var response = _udpClient.Receive(ref _ipEndPoint);
 
@@ -149,7 +148,7 @@ public sealed class Server : IDisposable
             {
                 false when multiPacketHeader.IsCompressed => 20,
                 false when !multiPacketHeader.IsCompressed => 12,
-                true => 9
+                _ => 9
             };
 
             response = response.Skip(payloadIndex).ToArray();
@@ -190,7 +189,7 @@ public sealed class Server : IDisposable
         {
             return ExecuteQuery(
             [
-                ..request.ReadRequestPayloadIdentifier() == PayloadIdentifier.Informations ? request : [ request[0] ],
+                ..request.ReadRequestPayloadIdentifier() == PayloadIdentifier.Information ? request : [ request[0] ],
                 ..response.Skip(response.Length - 4)
             ]);
         }
@@ -204,7 +203,7 @@ public sealed class Server : IDisposable
 #if NETCOREAPP2_0_OR_GREATER
         await _udpClient.SendAsync((byte[])[ ..PacketHeader, ..request ], cancellationToken);
 #else
-        await _udpClient.SendAsync((byte[])[ ..PacketHeader, ..request ], PacketHeader.Length + request.Length);
+        await _udpClient.SendAsync([ ..PacketHeader, ..request ], PacketHeader.Length + request.Length);
 #endif
 
 #if NETCOREAPP2_0_OR_GREATER
@@ -233,7 +232,7 @@ public sealed class Server : IDisposable
                 // Packet Header(4) + ID(4) + Total Packets(1) + Packet Number(1) + Maximum Packet Size(2)
                 false when !multiPacketHeader.IsCompressed => 12,
                 // Packet Header(4) + ID(4) + Packet Number(1)
-                true => 9
+                _ => 9
             };
 
             // We do not need the packet header. We already processed it and won't need again. So, just trim it.
@@ -283,7 +282,7 @@ public sealed class Server : IDisposable
         {
             return await ExecuteQueryAsync(
             [
-                ..request.ReadRequestPayloadIdentifier() == PayloadIdentifier.Informations ? request : [ request[0] ],
+                ..request.ReadRequestPayloadIdentifier() == PayloadIdentifier.Information ? request : [ request[0] ],
                 ..response.Skip(response.Length - 4)
             ], cancellationToken);
         }

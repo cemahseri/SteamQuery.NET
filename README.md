@@ -11,9 +11,9 @@ You can check the ExampleApplication project!
 ```csharp
 var server = new Server("127.0.0.1:27015");
 
-var informations = await server.GetInformationsAsync();
+var information = await server.GetInformationAsync();
 
-Console.WriteLine($"Server Name: {informations.ServerName}");
+Console.WriteLine($"Server Name: {information.ServerName}");
 
 server.Close();
 ```
@@ -22,11 +22,11 @@ Or you can use `using` keyword to let .NET take care of the disposal process of 
 ```csharp
 using var server = new Server("127.0.0.1", 27015);
 
-var informations = await server.GetInformationsAsync();
-Console.WriteLine($"Server Name: {informations.ServerName}");
+var information = await server.GetInformationAsync();
+Console.WriteLine($"Server Name: {information.ServerName}");
 
 var players = await server.GetPlayersAsync();
-Console.WriteLine($"Online Players: {players.Count}/{informations.MaxPlayers}");
+Console.WriteLine($"Online Players: {players.Count}/{information.MaxPlayers}");
 
 var rules = await server.GetRulesAsync();
 foreach (var rule in rules)
@@ -39,9 +39,9 @@ You can also use a host name, instead of IP address. And also the synchronous me
 ```csharp
 using var server = new Server("localhost:27015");
 
-var informations = server.GetInformations();
+var information = server.GetInformation();
 
-Console.WriteLine($"Server Name: {informations.ServerName}");
+Console.WriteLine($"Server Name: {information.ServerName}");
 ```
 
 # Supported Frameworks

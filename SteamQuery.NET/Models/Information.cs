@@ -2,7 +2,7 @@
 
 namespace SteamQuery.Models;
 
-public sealed record Informations
+public sealed record Information
 {
     public byte Protocol { get; internal set; }
 

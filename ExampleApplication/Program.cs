@@ -6,56 +6,56 @@ Console.OutputEncoding = Encoding.UTF8;
 // Pick a server from: https://www.gametracker.com/search/cs/
 using var server = new Server("127.0.0.1:27015");
 
-var informations = await server.GetInformationsAsync();
+var information = await server.GetInformationAsync();
 
-Console.WriteLine($"Protocol: {informations.Protocol}");
-Console.WriteLine($"Server Name: {informations.ServerName}");
-Console.WriteLine($"Folder: {informations.Folder}");
-Console.WriteLine($"Game Name: {informations.GameName}");
-Console.WriteLine($"Players: {informations.Players.Count}/{informations.MaxPlayers}");
-Console.WriteLine($"Bots: {informations.Bots}");
-Console.WriteLine($"Server Type: {informations.ServerType}");
-Console.WriteLine($"Environment: {informations.Environment}");
-Console.WriteLine($"Visible: {informations.Visible}");
-Console.WriteLine($"VAC Secured: {informations.VacSecured}");
-Console.WriteLine($"Version: {informations.Version}");
+Console.WriteLine($"Protocol: {information.Protocol}");
+Console.WriteLine($"Server Name: {information.ServerName}");
+Console.WriteLine($"Folder: {information.Folder}");
+Console.WriteLine($"Game Name: {information.GameName}");
+Console.WriteLine($"Players: {information.Players.Count}/{information.MaxPlayers}");
+Console.WriteLine($"Bots: {information.Bots}");
+Console.WriteLine($"Server Type: {information.ServerType}");
+Console.WriteLine($"Environment: {information.Environment}");
+Console.WriteLine($"Visible: {information.Visible}");
+Console.WriteLine($"VAC Secured: {information.VacSecured}");
+Console.WriteLine($"Version: {information.Version}");
 
 Console.WriteLine();
 
-var hasExtraDataFlag = informations.ExtraDataFlag.HasValue;
+var hasExtraDataFlag = information.ExtraDataFlag.HasValue;
 
 Console.WriteLine($"Has Extra Data Flag: {hasExtraDataFlag}");
 
 if (hasExtraDataFlag)
 {
-    if (informations.Port.HasValue)
+    if (information.Port.HasValue)
     {
-        Console.WriteLine($"Port: {informations.Port.Value}");
+        Console.WriteLine($"Port: {information.Port.Value}");
     }
 
-    if (informations.SteamId.HasValue)
+    if (information.SteamId.HasValue)
     {
-        Console.WriteLine($"SteamID: {informations.SteamId.Value}");
+        Console.WriteLine($"SteamID: {information.SteamId.Value}");
     }
 
-    if (informations.GameId.HasValue)
+    if (information.GameId.HasValue)
     {
-        Console.WriteLine($"Game ID: {informations.GameId.Value}");
+        Console.WriteLine($"Game ID: {information.GameId.Value}");
     }
 
-    if (informations.SourceTvPort.HasValue)
+    if (information.SourceTvPort.HasValue)
     {
-        Console.WriteLine($"SourceTV Port: {informations.SourceTvPort.Value}");
+        Console.WriteLine($"SourceTV Port: {information.SourceTvPort.Value}");
     }
 
-    if (!string.IsNullOrEmpty(informations.SourceTvName))
+    if (!string.IsNullOrEmpty(information.SourceTvName))
     {
-        Console.WriteLine($"SourceTV Name: {informations.SourceTvName}");
+        Console.WriteLine($"SourceTV Name: {information.SourceTvName}");
     }
 
-    if (!string.IsNullOrEmpty(informations.Keywords))
+    if (!string.IsNullOrEmpty(information.Keywords))
     {
-        Console.WriteLine($"Keywords: {informations.Keywords}");
+        Console.WriteLine($"Keywords: {information.Keywords}");
     }
 }
 
@@ -63,7 +63,7 @@ Console.WriteLine();
 
 var players = await server.GetPlayersAsync();
 
-Console.WriteLine($"Online Players: {players.Count}/{informations.MaxPlayers}");
+Console.WriteLine($"Online Players: {players.Count}/{information.MaxPlayers}");
 
 foreach (var player in players)
 {
