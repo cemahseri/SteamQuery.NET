@@ -60,6 +60,7 @@ Console.WriteLine($"Server Name: {information.ServerName}");
 # To-Do
 - Obsolete, pre-Steam GoldSource protocol.
 - bzip2 decompression. *(It's kind of implemented. I just couldn't find any server that uses bzip2 compression. If you know any, just hit me up. I'd appreciate it.)*
+- Master Server Query Protocol.
 
 ## For More Information
 If you want to learn more about Steam's server queries and their weird behaviors, check [Steam server queries developer community page](https://developer.valvesoftware.com/wiki/Server_queries) and [talk page about it](https://developer.valvesoftware.com/wiki/Talk:Server_queries).
