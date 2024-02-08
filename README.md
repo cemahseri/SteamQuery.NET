@@ -49,7 +49,7 @@ Console.WriteLine($"Server Name: {information.ServerName}");
 |-| :---: | :---: |
 | **.NET**            |             | **5.0-8.0** |
 | **.NET Core**       | **1.0-1.1** | **2.0-3.1** |
-| **.NET Framework**<sup>[1]</sup>  | **1.0-4.6** | **4.6.1<sup>[2]</sup>-4.8.1** |
+| **.NET Framework**<sup>[1]</sup>  | **1.0-4.6** | **4.6.1**<sup>[2]</sup>**-4.8.1** |
 
 [[1]](https://learn.microsoft.com/en-us/dotnet/standard/net-standard?tabs=net-standard-2-0#select-net-standard-version)
 >The versions listed for .NET Framework apply to .NET Core 2.0 SDK and later versions of the tooling. Older versions used a different mapping for .NET Standard 1.5 and higher.
