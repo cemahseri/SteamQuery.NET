@@ -1,4 +1,6 @@
-﻿namespace SteamQuery.Models;
+﻿using System.Globalization;
+
+namespace SteamQuery.Models;
 
 public record SteamQueryPlayer
 {
@@ -16,7 +18,7 @@ public record SteamQueryPlayer
         {
             _durationSeconds = value;
             DurationTimeSpan = TimeSpan.FromSeconds(value);
-            Duration = DurationTimeSpan.ToString(@"hh\:mm\:ss");
+            Duration = DurationTimeSpan.ToString(@"hh\:mm\:ss", CultureInfo.InvariantCulture);
         }
     }
     public TimeSpan DurationTimeSpan { get; private set; }

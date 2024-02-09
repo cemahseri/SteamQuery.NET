@@ -3,9 +3,7 @@ using System.Net.Sockets;
 using ICSharpCode.SharpZipLib.BZip2;
 using SteamQuery.Enums;
 using SteamQuery.Exceptions;
-#if !NETCOREAPP2_0_OR_GREATER
 using SteamQuery.Extensions;
-#endif
 using SteamQuery.Helpers;
 using SteamQuery.Models;
 
@@ -306,17 +304,9 @@ public class GameServer : IDisposable
     //   and used CancellationToken.
     private async Task<byte[]> ExecuteQueryAsync(byte[] request, CancellationToken cancellationToken)
     {
-#if NETCOREAPP2_0_OR_GREATER
-        await _udpClient.SendAsync((byte[])[ ..PacketHeader, ..request ]).AsTask().WaitAsync(TimeSpan.FromMilliseconds(SendTimeout), cancellationToken);
-#else
-        await _udpClient.SendAsync([ ..PacketHeader, ..request ], PacketHeader.Length + request.Length).TimeoutAfterAsync(TimeSpan.FromMilliseconds(SendTimeout), cancellationToken: cancellationToken);
-#endif
+        await _udpClient.SendAsync([ ..PacketHeader, ..request ], PacketHeader.Length + request.Length).TimeoutAfterAsync(TimeSpan.FromMilliseconds(SendTimeout), cancellationToken);
 
-#if NETCOREAPP2_0_OR_GREATER
-        var response = (await _udpClient.ReceiveAsync().WaitAsync(TimeSpan.FromMilliseconds(ReceiveTimeout), cancellationToken)).Buffer;
-#else
         var response = (await _udpClient.ReceiveAsync().TimeoutAfterAsync(TimeSpan.FromMilliseconds(ReceiveTimeout), cancellationToken)).Buffer;
-#endif
 
         var packetHeader = response.ReadPacketIdentifier();
         if (packetHeader == PacketIdentifier.Split)
@@ -352,11 +342,7 @@ public class GameServer : IDisposable
             {
                 cancellationToken.ThrowIfCancellationRequested();
 
-#if NETCOREAPP2_0_OR_GREATER
-                remainingPackets.Add((await _udpClient.ReceiveAsync().WaitAsync(TimeSpan.FromMilliseconds(ReceiveTimeout), cancellationToken)).Buffer);
-#else
                 remainingPackets.Add((await _udpClient.ReceiveAsync().TimeoutAfterAsync(TimeSpan.FromMilliseconds(ReceiveTimeout), cancellationToken)).Buffer);
-#endif
             }
 
             // Combine the first response and remaining packets - of course after ordering it by packet number and trimming the packet header, just like above.
@@ -382,13 +368,11 @@ public class GameServer : IDisposable
         }
 
         var responsePayloadHeader = response.ReadResponsePayloadIdentifier();
-        var requestPayloadIdentifier = request.ReadRequestPayloadIdentifier();
-
         if (responsePayloadHeader == PayloadIdentifier.Challenge)
         {
             return await ExecuteQueryAsync(
             [
-                ..requestPayloadIdentifier == PayloadIdentifier.Information ? request : [ request[0] ],
+                ..request.ReadRequestPayloadIdentifier() == PayloadIdentifier.Information ? request : [ request[0] ],
                 ..response.Skip(response.Length - 4)
             ], cancellationToken);
         }

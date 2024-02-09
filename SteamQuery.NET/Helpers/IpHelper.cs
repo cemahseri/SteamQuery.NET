@@ -25,7 +25,7 @@ internal static class IpHelper
 
         // By using NumberStyles.None number style, we do not allow leading or trailing white space, thousands separators, or a decimal separator.
         // It means that the string to be parsed must consist of integral decimal digits only.
-        if (!ushort.TryParse(parts.Last(), NumberStyles.None, NumberFormatInfo.CurrentInfo, out var port))
+        if (!ushort.TryParse(parts.Last(), NumberStyles.None, NumberFormatInfo.InvariantInfo, out var port))
         {
             throw new InvalidPortException();
         }

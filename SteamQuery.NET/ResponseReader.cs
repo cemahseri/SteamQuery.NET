@@ -7,6 +7,7 @@ namespace SteamQuery;
 
 internal static class ResponseReader
 {
+    //TODO Use BinaryReader instead of manually reading them. (Thanks to @Trojaner.)
     internal static SteamQueryInformation ParseInformation(byte[] response)
     {
         return response.ReadResponsePayloadIdentifier() == PayloadIdentifier.ObsoleteGoldSource
