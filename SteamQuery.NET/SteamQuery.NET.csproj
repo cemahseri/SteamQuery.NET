@@ -13,7 +13,7 @@
   <PropertyGroup>
     <PackageId>SteamQuery.NET</PackageId>
     <Description>Yet another Steam server queries .NET wrapper.</Description>
-    <Version>1.0.2</Version>
+    <Version>1.1.0</Version>
     <Authors>cemahseri</Authors>
 
     <RepositoryUrl>https://github.com/cemahseri/SteamQuery.NET</RepositoryUrl>

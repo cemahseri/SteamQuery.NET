@@ -1,6 +1,6 @@
 ﻿namespace SteamQuery.Enums;
 
-public enum PayloadIdentifier : byte
+internal enum PayloadIdentifier : byte
 {
     Challenge = 0x41,
 
@@ -11,5 +11,5 @@ public enum PayloadIdentifier : byte
     GetChallenge = 0x57, // Deprecated
     Ping = 0x69,         // Deprecated
 
-    OldGoldSource = 0x6D
+    ObsoleteGoldSource = 0x6D
 }

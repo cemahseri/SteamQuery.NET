@@ -1,6 +1,6 @@
 ﻿namespace SteamQuery.Models;
 
-public sealed record Rule
+public sealed record SteamQueryRule
 {
     public string Name { get; internal set; }
 

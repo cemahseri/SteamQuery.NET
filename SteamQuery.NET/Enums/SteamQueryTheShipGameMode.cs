@@ -1,6 +1,6 @@
 ﻿namespace SteamQuery.Enums;
 
-public enum TheShipGameMode
+public enum SteamQueryTheShipGameMode
 {
     Hunt,
     Elimination,

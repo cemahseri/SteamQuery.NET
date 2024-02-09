@@ -1,6 +1,6 @@
 ﻿namespace SteamQuery.Models;
 
-public sealed record Player
+public sealed record SteamQueryPlayer
 {
     public byte Index { get; internal set; }
 

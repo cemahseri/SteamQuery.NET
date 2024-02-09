@@ -2,9 +2,9 @@
 
 namespace SteamQuery.Models;
 
-public sealed record Information
+public sealed record SteamQueryInformation
 {
-    public byte Protocol { get; internal set; }
+    public byte ProtocolVersion { get; internal set; }
 
     public string ServerName { get; internal set; }
 
@@ -16,21 +16,22 @@ public sealed record Information
 
     public short Id { get; internal set; }
 
-    public List<Player> Players { get; } = [];
+    public int OnlinePlayers { get; internal set; }
 
-    public int MaxPlayers => Players.Capacity;
+    public int MaxPlayers { get; internal set; }
 
     public int Bots { get; internal set; }
 
-    public ServerType ServerType { get; internal set; }
+    public SteamQueryServerType ServerType { get; internal set; }
 
-    public EnvironmentType Environment { get; internal set; }
+    public SteamQueryEnvironment Environment { get; internal set; }
 
     public bool Visible { get; internal set; }
 
     public bool VacSecured { get; internal set; }
 
-    public TheShipGameMode TheShipGameMode { get; internal set; }
+    // If the GameId is 2400.
+    public SteamQueryTheShipGameMode TheShipGameMode { get; internal set; }
     public byte TheShipWitnesses { get; internal set; }
     public byte TheShipDuration { get; internal set; }
 
@@ -50,4 +51,10 @@ public sealed record Information
     public string Keywords { get; internal set; }
 
     public ulong? GameId { get; internal set; }
+
+    // Obsolete GoldSource properties.
+    public bool? IsHalfLifeMod { get; internal set; }
+
+    // If the IsObsoloteGoldSourceMod is true.
+    public SteamQueryHalfLifeMod HalfLifeMod { get; internal set; } = new();
 }

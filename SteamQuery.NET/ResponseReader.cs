@@ -5,64 +5,132 @@ using SteamQuery.Models;
 
 namespace SteamQuery;
 
-public static class ResponseReader
+internal static class ResponseReader
 {
-    public static Information ParseInformation(byte[] response)
+    internal static SteamQueryInformation ParseInformation(byte[] response)
     {
-        var information = new Information();
+        return response.ReadResponsePayloadIdentifier() == PayloadIdentifier.ObsoleteGoldSource
+            ? ParseObsoleteInformationPayload(response)
+            : ParseStandardInformationPayload(response);
+    }
 
-        var index = 5; // First 4 bytes are FF prefixes and the other byte is header. Headers are always the same and we do not need them, so skip first 5 bytes.
+    private static SteamQueryInformation ParseObsoleteInformationPayload(byte[] response)
+    {
+        var information = new SteamQueryInformation();
 
-        information.Protocol = response.ReadByte(ref index);
+        // First 4 bytes are 0xFF packet header prefixes and the other byte is payload identifier.
+        // Payload identifiers are always the same and we do not need them. So, skip first 5 bytes.
+        var index = 5;
+
+        // This is the address property. We do not really need the server's IP address and port, do we?
+        response.ReadString(ref index);
+
+        information.ServerName = response.ReadString(ref index);
+        information.Map = response.ReadString(ref index);
+        information.Folder = response.ReadString(ref index);
+        information.GameName = response.ReadString(ref index);
+
+        information.OnlinePlayers = response.ReadByte(ref index);
+        information.MaxPlayers = response.ReadByte(ref index);
+
+        information.ProtocolVersion = response.ReadByte(ref index);
+
+        information.ServerType = response.ReadByte(ref index) switch
+        {
+            0x44 => SteamQueryServerType.Dedicated,
+            0x4C => SteamQueryServerType.NonDedicated,
+            0x50 => SteamQueryServerType.HlTv,
+            _ => SteamQueryServerType.Other
+        };
+
+        var environment = response.ReadByte(ref index);
+        information.Environment = environment switch
+        {
+            0x4C or 0x6C => SteamQueryEnvironment.Linux,
+            0x57 or 0x77 => SteamQueryEnvironment.Windows,
+            _ => throw new UnexpectedByteException(environment, [ 0x4C, 0x57 ])
+        };
+
+        information.Visible = response.ReadByte(ref index) == 0x00;
+
+        information.IsHalfLifeMod = response.ReadByte(ref index) == 0x01;
+
+        if (information.IsHalfLifeMod == true)
+        {
+            var halfLifeMod = new SteamQueryHalfLifeMod
+            {
+                Link = response.ReadString(ref index),
+                DownloadLink = response.ReadString(ref index)
+            };
+
+            // This does exist and equals to 0x00 for some reason...
+            response.ReadByte(ref index);
+
+            halfLifeMod.Version = response.ReadInt(ref index);
+            halfLifeMod.SizeInBytes = response.ReadInt(ref index);
+            halfLifeMod.IsMultiplayerOnly = response.ReadByte(ref index) == 0x01;
+            halfLifeMod.HasOwnDll = response.ReadByte(ref index) == 0x01;
+
+            information.HalfLifeMod = halfLifeMod;
+        }
+
+        information.VacSecured = response.ReadByte(ref index) == 0x01;
+
+        information.Bots = response.ReadByte(ref index);
+
+        return information;
+    }
+
+    private static SteamQueryInformation ParseStandardInformationPayload(byte[] response)
+    {
+        var information = new SteamQueryInformation();
+
+        var index = 5;
+
+        information.ProtocolVersion = response.ReadByte(ref index);
         information.ServerName = response.ReadString(ref index);
         information.Map = response.ReadString(ref index);
         information.Folder = response.ReadString(ref index);
         information.GameName = response.ReadString(ref index);
         information.Id = response.ReadShort(ref index);
 
-        var playerCount = response.ReadByte(ref index);
-        information.Players.Capacity = response.ReadByte(ref index);
-
-        for (var i = 0; i < playerCount; i++)
-        {
-            information.Players.Add(null); // Adding null instead of new object is faster and uses less memory - and also will help while garbage collecting, I guess.
-        }
-
+        information.OnlinePlayers = response.ReadByte(ref index);
+        information.MaxPlayers = response.ReadByte(ref index);
         information.Bots = response.ReadByte(ref index);
 
-        var serverType = response.ReadByte(ref index);
-        information.ServerType = serverType switch
+        information.ServerType = response.ReadByte(ref index) switch
         {
-            0x00 => ServerType.RagDollKungFu,
-            0x64 => ServerType.Dedicated,
-            0x6C => ServerType.NonDedicated,
-            0x70 => ServerType.SourceTv,
-            _ => throw new UnexpectedByteException(serverType, 0x00, 0x64, 0x6C, 0x70)
+            0x64 => SteamQueryServerType.Dedicated,
+            0x6C => SteamQueryServerType.NonDedicated,
+            0x70 => SteamQueryServerType.SourceTv,
+            _ => SteamQueryServerType.Other
         };
 
         var environment = response.ReadByte(ref index);
         information.Environment = environment switch
         {
-            0x6C => EnvironmentType.Linux,
-            0x6D => EnvironmentType.Mac,
-            0x6F => EnvironmentType.Mac,
-            0x77 => EnvironmentType.Windows,
-            _ => throw new UnexpectedByteException(environment, 0x6C, 0x6D, 0x6F, 0x77)
+            0x6C => SteamQueryEnvironment.Linux,
+            0x6D => SteamQueryEnvironment.Mac,
+            0x6F => SteamQueryEnvironment.Mac,
+            0x77 => SteamQueryEnvironment.Windows,
+            _ => throw new UnexpectedByteException(environment, [ 0x6C, 0x6D, 0x6F, 0x77 ])
         };
 
         information.Visible = response.ReadByte(ref index) == 0x00;
         information.VacSecured = response.ReadByte(ref index) == 0x01;
 
-        if (information.GameId == 2400) // 2400 is The Ship: Murder Party's application ID in Steam.
+        // 2400 is The Ship: Murder Party's application ID in Steam.
+        if (information.GameId == 2400)
         {
-            information.TheShipGameMode = (TheShipGameMode)response.ReadByte(ref index);
+            information.TheShipGameMode = (SteamQueryTheShipGameMode)response.ReadByte(ref index);
             information.TheShipWitnesses = response.ReadByte(ref index);
             information.TheShipDuration = response.ReadByte(ref index);
         }
 
         information.Version = response.ReadString(ref index);
 
-        if (response.Length - index > 0) // If we have the extra flags.
+        // If we have the extra flags.
+        if (response.Length - index > 0)
         {
             information.ExtraDataFlag = response.ReadByte(ref index);
 
@@ -96,16 +164,16 @@ public static class ResponseReader
         return information;
     }
 
-    public static List<Player> ParsePlayers(byte[] response)
+    internal static List<SteamQueryPlayer> ParsePlayers(byte[] response)
     {
-        var players = new List<Player>();
+        var players = new List<SteamQueryPlayer>();
 
         var index = 5;
 
         var playerCount = response.ReadByte(ref index);
         for (var i = 0; i < playerCount; i++)
         {
-            players.Add(new Player
+            players.Add(new SteamQueryPlayer
             {
                 Index = response.ReadByte(ref index),
                 Name = response.ReadString(ref index),
@@ -126,16 +194,16 @@ public static class ResponseReader
         return players;
     }
 
-    public static List<Rule> ParseRules(byte[] response)
+    internal static List<SteamQueryRule> ParseRules(byte[] response)
     {
-        var rules = new List<Rule>();
+        var rules = new List<SteamQueryRule>();
 
         var index = 5;
 
         var ruleCount = response.ReadShort(ref index);
         for (var i = 0; i < ruleCount; i++)
         {
-            rules.Add(new Rule
+            rules.Add(new SteamQueryRule
             {
                 Name = response.ReadString(ref index),
                 Value = response.ReadString(ref index)

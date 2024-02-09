@@ -11,12 +11,14 @@ internal static class ReaderHelper
 
     internal static MultiPacketHeader ReadMultiPacketHeader(this byte[] source)
     {
+        var index = 9;
+
         var multiPacketHeader = new MultiPacketHeader
         {
-            IsGoldSourceServer = source.ReadInt(10) == -1
+            IsGoldSourceServer = source.ReadInt(ref index) == -1
         };
 
-        var index = 4;
+        index = 4;
 
         multiPacketHeader.Id = source.ReadInt(ref index);
 
@@ -29,7 +31,8 @@ internal static class ReaderHelper
         }
         else
         {
-            multiPacketHeader.IsCompressed = ((multiPacketHeader.Id >> 31) & 1) == 1; // Reading most significant bit.
+            // Reading most significant bit.
+            multiPacketHeader.IsCompressed = ((multiPacketHeader.Id >> 31) & 1) == 1;
 
             multiPacketHeader.TotalPackets = source.ReadByte(ref index);
             multiPacketHeader.PacketNumber = source.ReadByte(ref index);
@@ -50,28 +53,26 @@ internal static class ReaderHelper
 
     internal static PayloadIdentifier ReadResponsePayloadIdentifier(this byte[] source)
         => (PayloadIdentifier)source[4];
-
+    
     internal static byte ReadByte(this byte[] source, ref int index)
         => source[index++];
 
     internal static short ReadShort(this byte[] source, ref int index)
         => BitConverter.ToInt16(source, (index += 2) - 2);
 
-    internal static int ReadInt(this byte[] source, int index)
-        => BitConverter.ToInt32(source, index);
-
     internal static int ReadInt(this byte[] source, ref int index)
         => BitConverter.ToInt32(source, (index += 4) - 4);
-
-    internal static ulong ReadUlong(this byte[] source, ref int index)
-        => BitConverter.ToUInt64(source, (index += 8) - 8);
 
     internal static float ReadFloat(this byte[] source, ref int index)
         => BitConverter.ToSingle(source, (index += 4) - 4);
 
+    internal static ulong ReadUlong(this byte[] source, ref int index)
+        => BitConverter.ToUInt64(source, (index += 8) - 8);
+
     internal static string ReadString(this byte[] source, ref int index)
     {
-        var terminatorIndex = Array.IndexOf<byte>(source, 0x00, index); // 0x00 is the byte value of null terminator. Strings in Steam queries are null-terminated.
+        // 0x00 is the byte value of null terminator. Strings in Steam queries are null-terminated.
+        var terminatorIndex = Array.IndexOf<byte>(source, 0x00, index);
         if (terminatorIndex == -1)
         {
             return null;
@@ -79,7 +80,8 @@ internal static class ReaderHelper
 
         var startIndex = index;
 
-        index = terminatorIndex + 1; // Place reader index to right after terminator.
+        // Place reader index to right after terminator.
+        index = terminatorIndex + 1;
 
         return Encoding.UTF8.GetString(source, startIndex, terminatorIndex - startIndex);
     }

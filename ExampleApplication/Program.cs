@@ -4,15 +4,18 @@ using SteamQuery;
 Console.OutputEncoding = Encoding.UTF8;
 
 // Pick a server from: https://www.gametracker.com/search/cs/
-using var server = new Server("127.0.0.1:27015");
+using var server = new GameServer("127.0.0.1:27015");
 
-var information = await server.GetInformationAsync();
+await server.PerformQueryAsync();
 
-Console.WriteLine($"Protocol: {information.Protocol}");
+var information = server.Information;
+
+
+Console.WriteLine($"Protocol: {information.ProtocolVersion}");
 Console.WriteLine($"Server Name: {information.ServerName}");
 Console.WriteLine($"Folder: {information.Folder}");
 Console.WriteLine($"Game Name: {information.GameName}");
-Console.WriteLine($"Players: {information.Players.Count}/{information.MaxPlayers}");
+Console.WriteLine($"Players: {information.OnlinePlayers}/{information.MaxPlayers}");
 Console.WriteLine($"Bots: {information.Bots}");
 Console.WriteLine($"Server Type: {information.ServerType}");
 Console.WriteLine($"Environment: {information.Environment}");
@@ -20,14 +23,27 @@ Console.WriteLine($"Visible: {information.Visible}");
 Console.WriteLine($"VAC Secured: {information.VacSecured}");
 Console.WriteLine($"Version: {information.Version}");
 
-Console.WriteLine();
-
-var hasExtraDataFlag = information.ExtraDataFlag.HasValue;
-
-Console.WriteLine($"Has Extra Data Flag: {hasExtraDataFlag}");
-
-if (hasExtraDataFlag)
+if (information.IsHalfLifeMod.HasValue)
 {
+    Console.WriteLine();
+
+    Console.WriteLine($"Is Half-Life Mod: {information.IsHalfLifeMod}");
+
+    if (information.IsHalfLifeMod == true)
+    {
+        Console.WriteLine($"Mod Link: {information.HalfLifeMod.Link}");
+        Console.WriteLine($"Mod Download Link: {information.HalfLifeMod.DownloadLink}");
+        Console.WriteLine($"Mod Version: {information.HalfLifeMod.Version}");
+        Console.WriteLine($"Size in Bytes: {information.HalfLifeMod.SizeInBytes}");
+        Console.WriteLine($"Is Multiplayer Only: {information.HalfLifeMod.IsMultiplayerOnly}");
+        Console.WriteLine($"Has Own DLL: {information.HalfLifeMod.HasOwnDll}");
+    }
+}
+
+if (information.ExtraDataFlag.HasValue)
+{
+    Console.WriteLine();
+
     if (information.Port.HasValue)
     {
         Console.WriteLine($"Port: {information.Port.Value}");
@@ -61,20 +77,14 @@ if (hasExtraDataFlag)
 
 Console.WriteLine();
 
-var players = await server.GetPlayersAsync();
-
-Console.WriteLine($"Online Players: {players.Count}/{information.MaxPlayers}");
-
-foreach (var player in players)
+foreach (var player in server.Players)
 {
     Console.WriteLine($"[{player.Index}] [{player.Duration}] {player.Score} - {player.Name}");
 }
 
 Console.WriteLine();
 
-var rules = await server.GetRulesAsync();
-
-foreach (var rule in rules)
+foreach (var rule in server.Rules)
 {
     Console.WriteLine($"{rule.Name} = {rule.Value}");
 }

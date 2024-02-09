@@ -7,7 +7,7 @@ namespace SteamQuery.Helpers;
 
 internal static class IpHelper
 {
-    internal static IPEndPoint CreateIpEndPoint(string endpoint)
+    internal static IPEndPoint CreateIpEndPoint(string endpoint, AddressFamily addressFamily)
     {
         if (string.IsNullOrEmpty(endpoint))
         {
@@ -30,10 +30,10 @@ internal static class IpHelper
             throw new InvalidPortException();
         }
 
-        return CreateIpEndPoint(parts.First(), port);
+        return CreateIpEndPoint(parts.First(), port, addressFamily);
     }
 
-    internal static IPEndPoint CreateIpEndPoint(string hostNameOrIpAddress, int port)
+    internal static IPEndPoint CreateIpEndPoint(string hostNameOrIpAddress, int port, AddressFamily addressFamily)
     {
         if (string.IsNullOrEmpty(hostNameOrIpAddress))
         {
@@ -45,14 +45,23 @@ internal static class IpHelper
             throw new InvalidPortException();
         }
 
-        if (!IPAddress.TryParse(hostNameOrIpAddress, out var ipAddress)) // If it's not a valid IP address, then it might be a hostname like: play.somehostname.com
+        // If it's not a valid IP address, then it might be a hostname like: play.somehostname.com
+        if (!IPAddress.TryParse(hostNameOrIpAddress, out var ipAddress))
         {
-            ipAddress = Dns.GetHostAddresses(hostNameOrIpAddress).FirstOrDefault();
-            
+            try
+            {
+                // If there is no hostname like that, this will throw: "SocketException: No such host is known"
+                // So, instead, throw AddressNotFoundException below, which is much more explainful.
+                ipAddress = Dns.GetHostAddresses(hostNameOrIpAddress).FirstOrDefault(ip => ip.AddressFamily == addressFamily);
+            }
+            catch
+            {
+            }
+
             if (ipAddress == default)
             {
-                // Nah, it's not a valid hostname neither.
-                // Maybe there is no IP address that's binded with hostname or there is no any IPv4 address in that hostname.
+                // Nah, it's not a valid hostname either.
+                // Maybe there is no IP address that's binded with hostname.
                 throw new AddressNotFoundException();
             }
         }
