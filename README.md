@@ -68,12 +68,12 @@ FYI: Before you perform any queries, related properties will have default values
 ```csharp
 using var server = new GameServer("localhost:27015");
 
-Console.WriteLine($"Server Name: {server.Information.Servername}"); // Output will be like "Server Name: " because you did not perform the Information query.
+Console.WriteLine($"Server Name: {server.Information.ServerName}"); // Output will be like "Server Name: " because you did not perform the Information query.
 
 var information await server.GetInformationAsync();
 
-Console.WriteLine($"Server Name: {server.Information.Servername}"); // Server Name: [TR] AnneTokatlayan Pro Public
-Console.WriteLine($"Server Name: {information.Servername}"); // Server Name: [TR] AnneTokatlayan Pro Public
+Console.WriteLine($"Server Name: {server.Information.ServerName}"); // Server Name: [TR] AnneTokatlayan Pro Public
+Console.WriteLine($"Server Name: {information.ServerName}"); // Server Name: [TR] AnneTokatlayan Pro Public
 ```
 
 # Supported Frameworks
