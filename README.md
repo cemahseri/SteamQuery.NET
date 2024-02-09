@@ -35,7 +35,7 @@ server.Close();
 
 Or you can use `using` keyword to let .NET take care of the disposal process of server object;
 ```csharp
-using var server = new Server("127.0.0.1", 27015);
+using var server = new GameServer("127.0.0.1", 27015);
 
 var information = await server.GetInformationAsync();
 Console.WriteLine($"Server Name: {information.ServerName}"); // Server Name: [TR] AnneTokatlayan Pro Public
@@ -52,7 +52,7 @@ foreach (var rule in rules)
 
 You can also use a host name, instead of IP address. And also the synchronous methods!
 ```csharp
-using var server = new Server("localhost:27015");
+using var server = new GameServer("localhost:27015");
 
 var information = server.GetInformation();
 
@@ -61,7 +61,7 @@ Console.WriteLine($"Server Name: {information.ServerName}"); // Server Name: [TR
 
 FYI: Before you perform any queries, related properties will have default values.
 ```csharp
-using var server = new Server("localhost:27015");
+using var server = new GameServer("localhost:27015");
 
 Console.WriteLine($"Server Name: {server.Information.Servername}"); // Output will be like "Server Name: " because you did not perform the Information query.
 
