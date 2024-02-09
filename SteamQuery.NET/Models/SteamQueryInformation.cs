@@ -55,6 +55,6 @@ public sealed record SteamQueryInformation
     // Obsolete GoldSource properties.
     public bool? IsHalfLifeMod { get; internal set; }
 
-    // If the IsObsoloteGoldSourceMod is true.
+    // If the IsHalfLifeMod is true.
     public SteamQueryHalfLifeMod HalfLifeMod { get; internal set; } = new();
 }
