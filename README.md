@@ -22,10 +22,11 @@ server.Close();
 
 Or instead of performing all queries, you can specify which queries should be performed and also use timeouts;
 ```csharp
-var server = new GameServer("127.0.0.1:27015");
-
-server.SendTimeout = 1337;
-server.ReceiveTimeout = 7331;
+var server = new GameServer("127.0.0.1:27015")
+{
+    SendTimeout = 1337,
+    ReceiveTimeout = 7331
+};
 server.Reestablish(); // Have to reestablish the socket after changing timeouts. I will change this in the future. Either pass via constructor parameter or use builder pattern.
 
 await server.PerformQueryAsync(SteamQueryA2SQuery.Information | SteamQueryA2SQuery.Rules);
