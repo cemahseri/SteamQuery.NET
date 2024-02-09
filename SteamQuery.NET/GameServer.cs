@@ -225,8 +225,6 @@ public class GameServer : IDisposable
         }
     }
 
-    // The main reason that I seperated synchronous method and the asynchronous method is, there is not that much benefit writing synchronous method then running it in a Task.
-    // So, instead of that, I had seperated two methods and used asynchronous methods on the asynchronous method, such as UdpClient.SendAsync (instead of Send), UdpClient.ReceiveAsync (Receive), etc.
     // For comments, check the asynchronous method.
     private byte[] ExecuteQuery(byte[] request)
     {
@@ -296,19 +294,22 @@ public class GameServer : IDisposable
 
         if (responsePayloadHeader == PayloadIdentifier.ObsoleteGoldSource && request == InformationRequest)
         {
-            Close();
-            Initialize();
+            Reestablish();
         }
 
         return response;
     }
 
+    // The main reason that I seperated synchronous method and the asynchronous method is, there is not that much benefit
+    //   writing synchronous method then running it in a Task and calling it the "asynchronous version".
+    // So, instead of that, I had seperated two methods and used asynchronous methods on the asynchronous method, such as UdpClient.SendAsync (instead of Send), UdpClient.ReceiveAsync (Receive),
+    //   and used CancellationToken.
     private async Task<byte[]> ExecuteQueryAsync(byte[] request, CancellationToken cancellationToken)
     {
 #if NETCOREAPP2_0_OR_GREATER
         await _udpClient.SendAsync((byte[])[ ..PacketHeader, ..request ]).AsTask().WaitAsync(TimeSpan.FromMilliseconds(SendTimeout), cancellationToken);
 #else
-        await _udpClient.SendAsync([ ..PacketHeader, ..request ], PacketHeader.Length + request.Length).TimeoutAfterAsync(TimeSpan.FromMilliseconds(SendTimeout));
+        await _udpClient.SendAsync([ ..PacketHeader, ..request ], PacketHeader.Length + request.Length).TimeoutAfterAsync(TimeSpan.FromMilliseconds(SendTimeout), cancellationToken: cancellationToken);
 #endif
 
 #if NETCOREAPP2_0_OR_GREATER
@@ -397,13 +398,15 @@ public class GameServer : IDisposable
         // So instead of reading the second packet, just reestablish the connection.
         if (responsePayloadHeader == PayloadIdentifier.ObsoleteGoldSource && request == InformationRequest)
         {
-            Close();
-            Initialize();
+            Reestablish();
         }
 
         return response;
     }
 
+    /// <summary>
+    /// Initializes socket.
+    /// </summary>
     public void Initialize()
     {
         _udpClient = new UdpClient
@@ -416,6 +419,16 @@ public class GameServer : IDisposable
         };
 
         _udpClient.Client.Connect(IpEndPoint);
+    }
+
+    /// <summary>
+    /// Reestablishes socket.
+    /// </summary>
+    public void Reestablish()
+    {
+        Close();
+
+        Initialize();
     }
 
     /// <summary>

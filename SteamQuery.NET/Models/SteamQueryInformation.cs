@@ -2,7 +2,7 @@
 
 namespace SteamQuery.Models;
 
-public sealed record SteamQueryInformation
+public record SteamQueryInformation
 {
     public byte ProtocolVersion { get; internal set; }
 

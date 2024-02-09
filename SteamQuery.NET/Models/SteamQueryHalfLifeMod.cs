@@ -1,6 +1,6 @@
 ﻿namespace SteamQuery.Models;
 
-public sealed record SteamQueryHalfLifeMod
+public record SteamQueryHalfLifeMod
 {
     public string Link { get; internal set; }
 

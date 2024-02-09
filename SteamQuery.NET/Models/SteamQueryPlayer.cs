@@ -1,6 +1,6 @@
 ﻿namespace SteamQuery.Models;
 
-public sealed record SteamQueryPlayer
+public record SteamQueryPlayer
 {
     public byte Index { get; internal set; }
 
@@ -19,8 +19,8 @@ public sealed record SteamQueryPlayer
             Duration = DurationTimeSpan.ToString(@"hh\:mm\:ss");
         }
     }
-    public TimeSpan DurationTimeSpan { get; internal set; }
-    public string Duration { get; internal set; }
+    public TimeSpan DurationTimeSpan { get; private set; }
+    public string Duration { get; private set; }
 
     public int TheShipDeaths { get; internal set; }
     public int TheShipMoney { get; internal set; }
