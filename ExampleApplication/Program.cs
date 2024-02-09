@@ -10,7 +10,6 @@ await server.PerformQueryAsync();
 
 var information = server.Information;
 
-
 Console.WriteLine($"Protocol: {information.ProtocolVersion}");
 Console.WriteLine($"Server Name: {information.ServerName}");
 Console.WriteLine($"Folder: {information.Folder}");
