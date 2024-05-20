@@ -54,18 +54,37 @@ public class GameServer : IDisposable
     /// Port number of the server.
     /// </summary>
     public int Port => IpEndPoint.Port;
-    
+
     /// <summary>
     /// Gets or sets a value that specifies the amount of time in milliseconds, after which a connection or query call will time out.
     /// </summary>
     /// <returns>The time-out value, in milliseconds. If you set the property with a value between 1 and 499, the value will be changed to 500 - because how it is implemented in <see cref="Socket"/> class.
     /// <para>The default value is 0, which indicates an infinite time-out period. Specifying -1 also indicates an infinite time-out period.</para></returns>
-    public int SendTimeout { get; set; } = 5000;
+    public int SendTimeout
+    {
+        get => _sendTimeout;
+        set
+        {
+            _sendTimeout = value;
+            Reestablish();
+        }
+    }
+    private int _sendTimeout;
+
     /// <summary>
     /// Gets or sets a value that specifies the amount of time in milliseconds, after which a query receive call will time out.
     /// </summary>
     /// <returns>The time-out value, in milliseconds. The default value is 0, which indicates an infinite time-out period. Specifying -1 also indicates an infinite time-out period.</returns>
-    public int ReceiveTimeout { get; set; } = 5000;
+    public int ReceiveTimeout
+    {
+        get => _receiveTimeout;
+        set
+        {
+            _receiveTimeout = value;
+            Reestablish();
+        }
+    }
+    private int _receiveTimeout;
 
     private UdpClient _udpClient;
     private IPEndPoint _ipEndPoint;
