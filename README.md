@@ -69,7 +69,7 @@ using var server = new GameServer("localhost:27015");
 
 Console.WriteLine($"Server Name: {server.Information.ServerName}"); // Output will be like "Server Name: " because you did not perform the Information query.
 
-var information await server.GetInformationAsync();
+var information = await server.GetInformationAsync();
 
 Console.WriteLine($"Server Name: {server.Information.ServerName}"); // Server Name: [TR] AnneTokatlayan Pro Public
 Console.WriteLine($"Server Name: {information.ServerName}"); // Server Name: [TR] AnneTokatlayan Pro Public
@@ -80,12 +80,9 @@ Console.WriteLine($"Server Name: {information.ServerName}"); // Server Name: [TR
 |-| :---: | :---: |
 | **.NET**            |             | **5.0-8.0** |
 | **.NET Core**       | **1.0-1.1** | **2.0-3.1** |
-| **.NET Framework**<sup>[1]</sup>  | **1.0-4.6** | **4.6.1**<sup>[2]</sup>**-4.8.1** |
+| **.NET Framework**  | **1.0-4.6** | **4.6.1**<sup>[1]</sup>**-4.8.1** |
 
 [[1]](https://learn.microsoft.com/en-us/dotnet/standard/net-standard?tabs=net-standard-2-0#select-net-standard-version)
->The versions listed for .NET Framework apply to .NET Core 2.0 SDK and later versions of the tooling. Older versions used a different mapping for .NET Standard 1.5 and higher.
-
-[[2]](https://learn.microsoft.com/en-us/dotnet/standard/net-standard?tabs=net-standard-2-0#select-net-standard-version)
 >The versions listed here represent the rules that NuGet uses to determine whether a given .NET Standard library is applicable. While NuGet considers .NET Framework 4.6.1 as supporting .NET Standard 1.5 through 2.0, there are several issues with consuming .NET Standard libraries that were built for those versions from .NET Framework 4.6.1 projects. For .NET Framework projects that need to use such libraries, we recommend that you upgrade the project to target .NET Framework 4.7.2 or higher.
 
 # To-Do
