@@ -90,5 +90,9 @@ Console.WriteLine($"Server Name: {information.ServerName}"); // Server Name: [TR
 - Master Server Query Protocol.
 - Source RCON Protocol.
 
+# Projects That Use SteamQuery.NET
+You can create issue or pull request to get your open-sourced project added.
+- https://github.com/Runninginsilence1/l4d2serverquery
+
 ## For More Information
 If you want to learn more about Steam's server queries and their weird behaviors, check [Steam server queries developer community page](https://developer.valvesoftware.com/wiki/Server_queries) and [talk page about it](https://developer.valvesoftware.com/wiki/Talk:Server_queries).
