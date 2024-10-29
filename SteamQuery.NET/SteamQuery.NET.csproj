@@ -13,7 +13,7 @@
   <PropertyGroup>
     <PackageId>SteamQuery.NET</PackageId>
     <Description>Yet another Steam server queries .NET wrapper.</Description>
-    <Version>1.1.2</Version>
+    <Version>1.1.3</Version>
     <Authors>cemahseri</Authors>
 
     <RepositoryUrl>https://github.com/cemahseri/SteamQuery.NET</RepositoryUrl>
@@ -21,7 +21,7 @@
     <PackageTags>steam</PackageTags>
     <NeutralLanguage>en-US</NeutralLanguage>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageLicenseFile>LICENSE</PackageLicenseFile>
+    <PackageLicenseFile>UNLICENSE</PackageLicenseFile>
   </PropertyGroup>
 
   <ItemGroup>
@@ -30,7 +30,7 @@
       <PackagePath>\</PackagePath>
     </None>
 
-    <None Include="..\LICENSE">
+    <None Include="..\UNLICENSE">
       <Pack>True</Pack>
       <PackagePath>\</PackagePath>
     </None>

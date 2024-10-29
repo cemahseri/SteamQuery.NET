@@ -1,4 +1,5 @@
-﻿using System.Text;
+﻿using System.Buffers;
+using System.Text;
 
 namespace SteamQuery.Extensions;
 
@@ -6,14 +7,23 @@ internal static class BinaryReaderExtensions
 {
     internal static string ReadNullTerminatedString(this BinaryReader reader)
     {
-        var stringBuilder = new StringBuilder();
+        var buffer = ArrayPool<byte>.Shared.Rent(1 * 1024);
 
-        char character;
-        while ((character = reader.ReadChar()) != 0x00)
+        for (var i = 0; i < buffer.Length; i++)
         {
-            stringBuilder.Append(character);
+            var @byte = reader.ReadByte();
+            if (@byte == '\0')
+            {
+                break;
+            }
+
+            buffer[i] = @byte;
         }
 
-        return stringBuilder.ToString();
+        var @string = Encoding.UTF8.GetString(buffer);
+
+        ArrayPool<byte>.Shared.Return(buffer, true);
+
+        return @string;
     }
 }
