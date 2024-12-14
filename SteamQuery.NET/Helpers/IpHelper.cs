@@ -48,20 +48,12 @@ internal static class IpHelper
         // If it's not a valid IP address, then it might be a hostname like: play.somehostname.com
         if (!IPAddress.TryParse(hostNameOrIpAddress, out var ipAddress))
         {
-            try
-            {
-                // If there is no hostname like that, this will throw: "SocketException: No such host is known"
-                // So, instead, throw AddressNotFoundException below, which is much more explainful.
-                ipAddress = Dns.GetHostAddresses(hostNameOrIpAddress).FirstOrDefault(ip => ip.AddressFamily == addressFamily);
-            }
-            catch
-            {
-            }
+            ipAddress = Dns.GetHostAddresses(hostNameOrIpAddress)
+                .FirstOrDefault(ip => ip.AddressFamily == addressFamily);
 
-            if (ipAddress == default)
+            if (ipAddress == null)
             {
-                // Nah, it's not a valid hostname either.
-                // Maybe there is no IP address that's binded with hostname.
+                // Nah, it's not a valid hostname either. Perhaps there is no IP address that's bound with hostname.
                 throw new AddressNotFoundException();
             }
         }

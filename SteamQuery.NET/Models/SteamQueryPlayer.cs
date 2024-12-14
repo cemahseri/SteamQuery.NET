@@ -10,19 +10,9 @@ public record SteamQueryPlayer
 
     public long Score { get; internal set; }
 
-    private float _durationSeconds;
-    public float DurationSeconds
-    {
-        get => _durationSeconds;
-        internal set
-        {
-            _durationSeconds = value;
-            DurationTimeSpan = TimeSpan.FromSeconds(value);
-            Duration = DurationTimeSpan.ToString(@"hh\:mm\:ss", CultureInfo.InvariantCulture);
-        }
-    }
-    public TimeSpan DurationTimeSpan { get; private set; }
-    public string Duration { get; private set; }
+    public float DurationSeconds { get; internal set; }
+    public TimeSpan DurationTimeSpan => TimeSpan.FromSeconds(DurationSeconds);
+    public string Duration => DurationTimeSpan.ToString(@"hh\:mm\:ss", CultureInfo.InvariantCulture);
 
     public int TheShipDeaths { get; internal set; }
     public int TheShipMoney { get; internal set; }

@@ -86,13 +86,16 @@ Console.WriteLine($"Server Name: {information.ServerName}"); // Server Name: [TR
 >The versions listed here represent the rules that NuGet uses to determine whether a given .NET Standard library is applicable. While NuGet considers .NET Framework 4.6.1 as supporting .NET Standard 1.5 through 2.0, there are several issues with consuming .NET Standard libraries that were built for those versions from .NET Framework 4.6.1 projects. For .NET Framework projects that need to use such libraries, we recommend that you upgrade the project to target .NET Framework 4.7.2 or higher.
 
 # To-Do
-- bzip2 decompression. *(It's kind of implemented. I just couldn't find any server that uses bzip2 compression. If you know any, just hit me up. I'd appreciate it.)*
 - Master Server Query Protocol.
 - Source RCON Protocol.
+- bzip2 decompression. *(It's kind of implemented. I just couldn't find any server that uses bzip2 compression. If you know any, just hit me up. I'd appreciate it.)*
+- Remove target for .NET Standard 2.0 in next major version.
 
 # Projects That Use SteamQuery.NET
 You can create issue or pull request to get your open-sourced project added.
 - https://github.com/Runninginsilence1/l4d2serverquery
+- https://github.com/HMBSbige/A2SService
+- https://github.com/MikiraSora/DpMapSubscribeTool
 
 ## For More Information
 If you want to learn more about Steam's server queries and their weird behaviors, check [Steam server queries developer community page](https://developer.valvesoftware.com/wiki/Server_queries) and [talk page about it](https://developer.valvesoftware.com/wiki/Talk:Server_queries).

@@ -17,25 +17,25 @@ public class GameServer : IDisposable
 {
     /// <summary>
     /// Information of the server.
-    /// <para>Avaliable after calling <see cref="GetInformationAsync"/> or <see cref="PerformQueryAsync"/> - or obviously their synchronous versions.</para>
+    /// <para>Available after calling <see cref="GetInformationAsync"/> or <see cref="PerformQueryAsync"/> - or obviously their synchronous versions.</para>
     /// </summary>
     public SteamQueryInformation Information { get; private set; } = new();
 
     /// <summary>
     /// Players of the server.
-    /// <para>Avaliable after calling <see cref="GetPlayersAsync"/> or <see cref="PerformQueryAsync"/> - or obviously their synchronous versions.</para>
+    /// <para>Available after calling <see cref="GetPlayersAsync"/> or <see cref="PerformQueryAsync"/> - or obviously their synchronous versions.</para>
     /// </summary>
     public IReadOnlyList<SteamQueryPlayer> Players { get; private set; } = [];
 
     /// <summary>
     /// Rules of the server.
-    /// <para>Avaliable after calling <see cref="GetRulesAsync"/> or <see cref="PerformQueryAsync"/> - or obviously their synchronous versions.</para>
+    /// <para>Available after calling <see cref="GetRulesAsync"/> or <see cref="PerformQueryAsync"/> - or obviously their synchronous versions.</para>
     /// </summary>
     public IReadOnlyList<SteamQueryRule> Rules { get; private set; } = [];
 
     /// <summary>
     /// If the server is using compression before sending response.
-    /// <para>If the server is using Source protocol, this property will be avaliable after calling any query that will return multi-packet response.</para>
+    /// <para>If the server is using Source protocol, this property will be available after calling any query that will return multi-packet response.</para>
     /// <para>Steam uses a packet size of up to 1400 bytes + IP/UDP headers. If a request or response needs more packets for the data it starts the packets with an additional header.</para>
     /// </summary>
     public bool? IsUsingCompression { get; private set; }
@@ -62,14 +62,23 @@ public class GameServer : IDisposable
     /// <para>The default value is 0, which indicates an infinite time-out period. Specifying -1 also indicates an infinite time-out period.</para></returns>
     public int SendTimeout
     {
-        get => _sendTimeout;
+        get;
         set
         {
-            _sendTimeout = value;
+            if (value < -1)
+            {
+                throw new ArgumentOutOfRangeException(nameof(value));
+            }
+
+            if (value == -1)
+            {
+                value = 0;
+            }
+
+            field = value;
             Reestablish();
         }
     }
-    private int _sendTimeout;
 
     /// <summary>
     /// Gets or sets a value that specifies the amount of time in milliseconds, after which a query receive call will time out.
@@ -77,29 +86,40 @@ public class GameServer : IDisposable
     /// <returns>The time-out value, in milliseconds. The default value is 0, which indicates an infinite time-out period. Specifying -1 also indicates an infinite time-out period.</returns>
     public int ReceiveTimeout
     {
-        get => _receiveTimeout;
+        get;
         set
         {
-            _receiveTimeout = value;
+            if (value < -1)
+            {
+                throw new ArgumentOutOfRangeException(nameof(value));
+            }
+
+            if (value == -1)
+            {
+                value = 0;
+            }
+
+            field = value;
             Reestablish();
         }
     }
-    private int _receiveTimeout;
 
     private UdpClient _udpClient;
     private IPEndPoint _ipEndPoint;
 
+    private bool _disposed;
+
     private static readonly byte[] PacketHeader     = [ 0xFF, 0xFF, 0xFF, 0xFF ];
     private static readonly byte[] DefaultChallenge = PacketHeader;
 
-    private static readonly byte[] InformationRequest = [ (byte)PayloadIdentifier.Information, .."Source Engine Query\0"u8.ToArray() ];
+    private static readonly byte[] InformationRequest = [ (byte)PayloadIdentifier.Information, .."Source Engine Query\0"u8 ];
     private static readonly byte[] PlayersRequest     = [ (byte)PayloadIdentifier.Players,     ..DefaultChallenge ];
     private static readonly byte[] RulesRequest       = [ (byte)PayloadIdentifier.Rules,       ..DefaultChallenge ];
 
     /// <summary>
     /// Initialize a new instance of the <see cref="GameServer"/> class with given endpoint - in <see cref="string"/> type.
     /// </summary>
-    /// <param name="endPoint">IP endpoint. Seperating IP address (or hostname) and port number with colon is required.
+    /// <param name="endPoint">IP endpoint. Separating IP address (or hostname) and port number with colon is required.
     ///     <para>Example 1: 127.0.0.1:1337</para>
     ///     <para>Example 2: localhost:1337</para>
     /// </param>
@@ -110,6 +130,7 @@ public class GameServer : IDisposable
     /// <exception cref="FormatException">Thrown when endPoint is not in correct format.</exception>
     /// <exception cref="InvalidPortException">Thrown when port is not valid.</exception>
     /// <exception cref="AddressNotFoundException">Thrown when IP address hostname is not found.</exception>
+    /// <exception cref="SocketException">Thrown when host is known.</exception>
     public GameServer(string endPoint, AddressFamily addressFamily = AddressFamily.InterNetwork) : this(IpHelper.CreateIpEndPoint(endPoint, addressFamily))
     {
     }
@@ -126,6 +147,7 @@ public class GameServer : IDisposable
     /// </param>
     /// <exception cref="ArgumentNullException">Thrown when hostNameOrIpAddress is null or empty.</exception>
     /// <exception cref="AddressNotFoundException">Thrown when IP address or hostname is not found.</exception>
+    /// <exception cref="SocketException">Thrown when host is known.</exception>
     public GameServer(string hostNameOrIpAddress, int port, AddressFamily addressFamily = AddressFamily.InterNetwork) : this(IpHelper.CreateIpEndPoint(hostNameOrIpAddress, port, addressFamily))
     {
     }
@@ -224,21 +246,22 @@ public class GameServer : IDisposable
     /// Performs given queries asynchronously.
     /// </summary>
     /// <param name="queries">Queries to be performed.</param>
-    public async Task PerformQueryAsync(SteamQueryA2SQuery queries = SteamQueryA2SQuery.All)
+    /// <param name="cancellationToken">A <see cref="CancellationToken" /> to observe while waiting for the task to complete.</param>
+    public async Task PerformQueryAsync(SteamQueryA2SQuery queries = SteamQueryA2SQuery.All, CancellationToken cancellationToken = default)
     {
         if (queries.HasFlag(SteamQueryA2SQuery.Information))
         {
-            await GetInformationAsync();
+            await GetInformationAsync(cancellationToken);
         }
 
         if (queries.HasFlag(SteamQueryA2SQuery.Players))
         {
-            await GetPlayersAsync();
+            await GetPlayersAsync(cancellationToken);
         }
 
         if (queries.HasFlag(SteamQueryA2SQuery.Rules))
         {
-            await GetRulesAsync();
+            await GetRulesAsync(cancellationToken);
         }
     }
 
@@ -317,9 +340,9 @@ public class GameServer : IDisposable
         return response;
     }
 
-    // The main reason that I seperated synchronous method and the asynchronous method is, there is not that much benefit
+    // The main reason that I separated synchronous method and the asynchronous method is, there is not that much benefit
     //   writing synchronous method then running it in a Task and calling it the "asynchronous version".
-    // So, instead of that, I had seperated two methods and used asynchronous methods on the asynchronous method, such as UdpClient.SendAsync (instead of Send), UdpClient.ReceiveAsync (Receive),
+    // So, instead of that, I had separated two methods and used asynchronous methods on the asynchronous method, such as UdpClient.SendAsync (instead of Send), UdpClient.ReceiveAsync (Receive),
     //   and used CancellationToken.
     private async Task<byte[]> ExecuteQueryAsync(byte[] request, CancellationToken cancellationToken)
     {
@@ -391,7 +414,7 @@ public class GameServer : IDisposable
         {
             return await ExecuteQueryAsync(
             [
-                ..request.ReadRequestPayloadIdentifier() == PayloadIdentifier.Information ? request : [ request[0] ],
+                ..request.ReadRequestPayloadIdentifier() == PayloadIdentifier.Information ? request : [ request.First() ],
                 ..response.Skip(response.Length - 4)
             ], cancellationToken);
         }
@@ -445,5 +468,26 @@ public class GameServer : IDisposable
     /// <summary>
     /// Disposes the class.
     /// </summary>
-    public void Dispose() => Close();
+    public void Dispose()
+    {
+        Dispose(true);
+
+        GC.SuppressFinalize(this);
+    }
+
+    protected virtual void Dispose(bool disposing)
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        if (disposing)
+        {
+            _udpClient.Dispose();
+            _udpClient = null;
+        }
+
+        _disposed = true;
+    }
 }

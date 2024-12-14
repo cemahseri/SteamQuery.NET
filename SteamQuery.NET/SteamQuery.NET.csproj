@@ -5,7 +5,7 @@
 
     <ImplicitUsings>enable</ImplicitUsings>
 
-    <LangVersion>latest</LangVersion>
+    <LangVersion>preview</LangVersion>
 
     <RootNamespace>SteamQuery</RootNamespace>
   </PropertyGroup>
@@ -13,7 +13,7 @@
   <PropertyGroup>
     <PackageId>SteamQuery.NET</PackageId>
     <Description>Yet another Steam server queries .NET wrapper.</Description>
-    <Version>1.1.4</Version>
+    <Version>1.1.5</Version>
     <Authors>cemahseri</Authors>
 
     <RepositoryUrl>https://github.com/cemahseri/SteamQuery.NET</RepositoryUrl>
