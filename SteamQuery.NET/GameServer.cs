@@ -60,49 +60,29 @@ public class GameServer : IDisposable
     /// </summary>
     /// <returns>The time-out value, in milliseconds. If you set the property with a value between 1 and 499, the value will be changed to 500 - because how it is implemented in <see cref="Socket"/> class.
     /// <para>The default value is 0, which indicates an infinite time-out period. Specifying -1 also indicates an infinite time-out period.</para></returns>
-    public int SendTimeout
+    public TimeSpan SendTimeout
     {
         get;
         set
         {
-            if (value < -1)
-            {
-                throw new ArgumentOutOfRangeException(nameof(value));
-            }
-
-            if (value == -1)
-            {
-                value = 0;
-            }
-
             field = value;
             Reestablish();
         }
-    }
+    } = Timeout.InfiniteTimeSpan;
 
     /// <summary>
     /// Gets or sets a value that specifies the amount of time in milliseconds, after which a query receive call will time out.
     /// </summary>
     /// <returns>The time-out value, in milliseconds. The default value is 0, which indicates an infinite time-out period. Specifying -1 also indicates an infinite time-out period.</returns>
-    public int ReceiveTimeout
+    public TimeSpan ReceiveTimeout
     {
         get;
         set
         {
-            if (value < -1)
-            {
-                throw new ArgumentOutOfRangeException(nameof(value));
-            }
-
-            if (value == -1)
-            {
-                value = 0;
-            }
-
             field = value;
             Reestablish();
         }
-    }
+    } = Timeout.InfiniteTimeSpan;
 
     private UdpClient _udpClient;
     private IPEndPoint _ipEndPoint;
@@ -128,7 +108,8 @@ public class GameServer : IDisposable
     /// </param>
     /// <exception cref="ArgumentNullException">Thrown when endPoint is null or empty.</exception>
     /// <exception cref="FormatException">Thrown when endPoint is not in correct format.</exception>
-    /// <exception cref="InvalidPortException">Thrown when port is not valid.</exception>
+    /// <exception cref="InvalidPortException">Thrown when port in endPoint is not in correct format.</exception>
+    /// <exception cref="ArgumentOutOfRangeException">Thrown when port is not valid.</exception>
     /// <exception cref="AddressNotFoundException">Thrown when IP address hostname is not found.</exception>
     /// <exception cref="SocketException">Thrown when host is known.</exception>
     public GameServer(string endPoint, AddressFamily addressFamily = AddressFamily.InterNetwork) : this(IpHelper.CreateIpEndPoint(endPoint, addressFamily))
@@ -146,6 +127,7 @@ public class GameServer : IDisposable
     ///     <para>This has no effect if IP address is used, instead of hostname.</para>
     /// </param>
     /// <exception cref="ArgumentNullException">Thrown when hostNameOrIpAddress is null or empty.</exception>
+    /// <exception cref="ArgumentOutOfRangeException">Thrown when port is not valid.</exception>
     /// <exception cref="AddressNotFoundException">Thrown when IP address or hostname is not found.</exception>
     /// <exception cref="SocketException">Thrown when host is known.</exception>
     public GameServer(string hostNameOrIpAddress, int port, AddressFamily addressFamily = AddressFamily.InterNetwork) : this(IpHelper.CreateIpEndPoint(hostNameOrIpAddress, port, addressFamily))
@@ -177,7 +159,7 @@ public class GameServer : IDisposable
     /// </summary>
     public SteamQueryInformation GetInformation()
     {
-        return Information = ResponseReader.ParseInformation(ExecuteQuery(InformationRequest));
+        return Information = ServerQueryResponseReader.ParseInformation(ExecuteQuery(InformationRequest));
     }
 
     /// <summary>
@@ -185,7 +167,7 @@ public class GameServer : IDisposable
     /// </summary>
     public async Task<SteamQueryInformation> GetInformationAsync(CancellationToken cancellationToken = default)
     {
-        return Information = ResponseReader.ParseInformation(await ExecuteQueryAsync(InformationRequest, cancellationToken));
+        return Information = ServerQueryResponseReader.ParseInformation(await ExecuteQueryAsync(InformationRequest, cancellationToken));
     }
 
     /// <summary>
@@ -193,7 +175,7 @@ public class GameServer : IDisposable
     /// </summary>
     public IReadOnlyList<SteamQueryPlayer> GetPlayers()
     {
-        return Players = ResponseReader.ParsePlayers(ExecuteQuery(PlayersRequest));
+        return Players = ServerQueryResponseReader.ParsePlayers(ExecuteQuery(PlayersRequest));
     }
 
     /// <summary>
@@ -201,7 +183,7 @@ public class GameServer : IDisposable
     /// </summary>
     public async Task<IReadOnlyList<SteamQueryPlayer>> GetPlayersAsync(CancellationToken cancellationToken = default)
     {
-        return Players = ResponseReader.ParsePlayers(await ExecuteQueryAsync(PlayersRequest, cancellationToken));
+        return Players = ServerQueryResponseReader.ParsePlayers(await ExecuteQueryAsync(PlayersRequest, cancellationToken));
     }
 
     /// <summary>
@@ -209,7 +191,7 @@ public class GameServer : IDisposable
     /// </summary>
     public IReadOnlyList<SteamQueryRule> GetRules()
     {
-        return Rules = ResponseReader.ParseRules(ExecuteQuery(RulesRequest));
+        return Rules = ServerQueryResponseReader.ParseRules(ExecuteQuery(RulesRequest));
     }
 
     /// <summary>
@@ -217,7 +199,7 @@ public class GameServer : IDisposable
     /// </summary>
     public async Task<IReadOnlyList<SteamQueryRule>> GetRulesAsync(CancellationToken cancellationToken = default)
     {
-        return Rules = ResponseReader.ParseRules(await ExecuteQueryAsync(RulesRequest, cancellationToken));
+        return Rules = ServerQueryResponseReader.ParseRules(await ExecuteQueryAsync(RulesRequest, cancellationToken));
     }
 
     /// <summary>
@@ -346,9 +328,9 @@ public class GameServer : IDisposable
     //   and used CancellationToken.
     private async Task<byte[]> ExecuteQueryAsync(byte[] request, CancellationToken cancellationToken)
     {
-        await _udpClient.SendAsync([ ..PacketHeader, ..request ], PacketHeader.Length + request.Length).TimeoutAfterAsync(TimeSpan.FromMilliseconds(SendTimeout), cancellationToken);
+        await _udpClient.SendAsync([ ..PacketHeader, ..request ], PacketHeader.Length + request.Length).WaitAsync(SendTimeout, cancellationToken);
 
-        var response = (await _udpClient.ReceiveAsync().TimeoutAfterAsync(TimeSpan.FromMilliseconds(ReceiveTimeout), cancellationToken)).Buffer;
+        var response = (await _udpClient.ReceiveAsync().WaitAsync(ReceiveTimeout, cancellationToken)).Buffer;
 
         var packetHeader = response.ReadPacketIdentifier();
         if (packetHeader == PacketIdentifier.Split)
@@ -382,9 +364,7 @@ public class GameServer : IDisposable
 
             for (var i = 1; i < multiPacketHeader.TotalPackets; i++)
             {
-                cancellationToken.ThrowIfCancellationRequested();
-
-                remainingPackets.Add((await _udpClient.ReceiveAsync().TimeoutAfterAsync(TimeSpan.FromMilliseconds(ReceiveTimeout), cancellationToken)).Buffer);
+                remainingPackets.Add((await _udpClient.ReceiveAsync().WaitAsync(ReceiveTimeout, cancellationToken)).Buffer);
             }
 
             // Combine the first response and remaining packets - of course after ordering it by packet number and trimming the packet header, just like above.
@@ -439,8 +419,8 @@ public class GameServer : IDisposable
         {
             Client =
             {
-                SendTimeout = SendTimeout,
-                ReceiveTimeout = ReceiveTimeout
+                SendTimeout = (int)SendTimeout.TotalSeconds,
+                ReceiveTimeout = (int)ReceiveTimeout.TotalSeconds
             }
         };
 

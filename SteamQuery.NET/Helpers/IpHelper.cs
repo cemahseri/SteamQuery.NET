@@ -7,19 +7,21 @@ namespace SteamQuery.Helpers;
 
 internal static class IpHelper
 {
-    internal static IPEndPoint CreateIpEndPoint(string endpoint, AddressFamily addressFamily)
+    internal static IPEndPoint CreateIpEndPoint(string endpoint, AddressFamily addressFamily = AddressFamily.InterNetwork)
     {
         if (string.IsNullOrEmpty(endpoint))
         {
             throw new ArgumentNullException(nameof(endpoint));
         }
 
-        var parts = endpoint.Split(':');
+        var parts = endpoint.Split(':', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
         if (parts.Length != 2)
         {
             // If result of splitting the endpoint by colon does not return 2 items, it means that endpoint format is wrong.
             // Example 1: "localhost"
-            // Example 2: "127.0.0.1:1337:27015"
+            // Example 2: "localhost:"
+            // Example 3: ":27015"
+            // Example 4: "127.0.0.1:1337:27015"
             throw new FormatException("Invalid endpoint format.");
         }
 
@@ -33,16 +35,16 @@ internal static class IpHelper
         return CreateIpEndPoint(parts.First(), port, addressFamily);
     }
 
-    internal static IPEndPoint CreateIpEndPoint(string hostNameOrIpAddress, int port, AddressFamily addressFamily)
+    internal static IPEndPoint CreateIpEndPoint(string hostNameOrIpAddress, int port, AddressFamily addressFamily = AddressFamily.InterNetwork)
     {
         if (string.IsNullOrEmpty(hostNameOrIpAddress))
         {
             throw new ArgumentNullException(nameof(hostNameOrIpAddress));
         }
-
-        if (port is < ushort.MinValue or > ushort.MaxValue)
+        
+        if (port is < IPEndPoint.MinPort or > IPEndPoint.MaxPort)
         {
-            throw new InvalidPortException();
+            throw new ArgumentOutOfRangeException(nameof(port));
         }
 
         // If it's not a valid IP address, then it might be a hostname like: play.somehostname.com

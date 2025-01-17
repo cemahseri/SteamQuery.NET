@@ -5,7 +5,7 @@ using SteamQuery.Models;
 
 namespace SteamQuery;
 
-internal static class ResponseReader
+internal static class ServerQueryResponseReader
 {
     internal static SteamQueryInformation ParseInformation(byte[] response)
     {

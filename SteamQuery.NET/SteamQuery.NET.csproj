@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>Library</OutputType>
-    <TargetFrameworks>net8.0;netstandard2.0</TargetFrameworks>
+    <TargetFrameworks>net9.0</TargetFrameworks>
 
     <ImplicitUsings>enable</ImplicitUsings>
 
@@ -13,7 +13,7 @@
   <PropertyGroup>
     <PackageId>SteamQuery.NET</PackageId>
     <Description>Yet another Steam server queries .NET wrapper.</Description>
-    <Version>1.1.5</Version>
+    <Version>2.0.0</Version>
     <Authors>cemahseri</Authors>
 
     <RepositoryUrl>https://github.com/cemahseri/SteamQuery.NET</RepositoryUrl>
@@ -21,7 +21,7 @@
     <PackageTags>steam</PackageTags>
     <NeutralLanguage>en-US</NeutralLanguage>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageLicenseFile>UNLICENSE</PackageLicenseFile>
+    <PackageLicenseFile>LICENSE</PackageLicenseFile>
   </PropertyGroup>
 
   <ItemGroup>
@@ -30,7 +30,7 @@
       <PackagePath>\</PackagePath>
     </None>
 
-    <None Include="..\UNLICENSE">
+    <None Include="..\LICENSE">
       <Pack>True</Pack>
       <PackagePath>\</PackagePath>
     </None>
