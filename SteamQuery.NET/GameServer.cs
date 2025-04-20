@@ -43,7 +43,16 @@ public class GameServer : IDisposable
     /// <summary>
     /// IP endpoint of the server.
     /// </summary>
-    public IPEndPoint IpEndPoint => _ipEndPoint;
+    public IPEndPoint IpEndPoint
+    {
+        get => _ipEndPoint;
+        set
+        {
+            _ipEndPoint = value;
+
+            Reestablish();
+        }
+    }
 
     /// <summary>
     /// IP address of the server.
@@ -54,35 +63,42 @@ public class GameServer : IDisposable
     /// Port number of the server.
     /// </summary>
     public int Port => IpEndPoint.Port;
-
+    
     /// <summary>
-    /// Gets or sets a value that specifies the amount of time in milliseconds, after which a connection or query call will time out.
+    /// The timeout after which a connection or query call should be faulted with a <see cref="TimeoutException"/> if it hasn't otherwise completed.
+    /// <para>The default value is 30 seconds.</para>
     /// </summary>
-    /// <returns>The time-out value, in milliseconds. If you set the property with a value between 1 and 499, the value will be changed to 500 - because how it is implemented in <see cref="Socket"/> class.
-    /// <para>The default value is 0, which indicates an infinite time-out period. Specifying -1 also indicates an infinite time-out period.</para></returns>
     public TimeSpan SendTimeout
     {
         get;
         set
         {
             field = value;
-            Reestablish();
+            
+            if (_udpClient != null && _udpClient.Client.Connected)
+            {
+                _udpClient.Client.SendTimeout = (int)value.TotalMilliseconds;
+            }
         }
-    } = Timeout.InfiniteTimeSpan;
-
+    } = TimeSpan.FromSeconds(30.0d);
+    
     /// <summary>
-    /// Gets or sets a value that specifies the amount of time in milliseconds, after which a query receive call will time out.
+    /// The timeout after which a query receive call should be faulted with a <see cref="TimeoutException"/> if it hasn't otherwise completed.
+    /// <para>The default value is 30 seconds.</para>
     /// </summary>
-    /// <returns>The time-out value, in milliseconds. The default value is 0, which indicates an infinite time-out period. Specifying -1 also indicates an infinite time-out period.</returns>
     public TimeSpan ReceiveTimeout
     {
         get;
         set
         {
             field = value;
-            Reestablish();
+
+            if (_udpClient != null && _udpClient.Client.Connected)
+            {
+                _udpClient.Client.ReceiveTimeout = (int)value.TotalMilliseconds;
+            }
         }
-    } = Timeout.InfiniteTimeSpan;
+    } = TimeSpan.FromSeconds(30.0d);
 
     private UdpClient _udpClient;
     private IPEndPoint _ipEndPoint;
@@ -135,6 +151,14 @@ public class GameServer : IDisposable
     }
 
     /// <summary>
+    /// Initialize a new instance of the <see cref="GameServer"/> class with given <see cref="MasterServerResponse"/>.
+    /// </summary>
+    /// <param name="masterServerResponse">Master server response that you got from <see cref="MasterServer"/>.</param>
+    public GameServer(MasterServerResponse masterServerResponse) : this(masterServerResponse.IpAddress, masterServerResponse.Port)
+    {
+    }
+
+    /// <summary>
     /// Initialize a new instance of the <see cref="GameServer"/> class with given IP address <i>(in <see cref="IPAddress"/> type)</i> and port number.
     /// </summary>
     /// <param name="ip">IP address.</param>
@@ -149,9 +173,14 @@ public class GameServer : IDisposable
     /// <param name="ipEndPoint">IP endpoint.</param>
     public GameServer(IPEndPoint ipEndPoint)
     {
-        _ipEndPoint = ipEndPoint;
-
-        Initialize();
+        IpEndPoint = ipEndPoint;
+    }
+    
+    /// <summary>
+    /// Initialize a new instance of the <see cref="GameServer"/> class.
+    /// </summary>
+    public GameServer()
+    {
     }
 
     /// <summary>
@@ -419,12 +448,12 @@ public class GameServer : IDisposable
         {
             Client =
             {
-                SendTimeout = (int)SendTimeout.TotalSeconds,
-                ReceiveTimeout = (int)ReceiveTimeout.TotalSeconds
+                SendTimeout = (int)SendTimeout.TotalMilliseconds,
+                ReceiveTimeout = (int)ReceiveTimeout.TotalMilliseconds
             }
         };
 
-        _udpClient.Client.Connect(IpEndPoint);
+        _udpClient.Connect(IpEndPoint);
     }
 
     /// <summary>
@@ -442,7 +471,7 @@ public class GameServer : IDisposable
     /// </summary>
     public void Close()
     {
-        _udpClient.Close();
+        _udpClient?.Close();
     }
 
     /// <summary>
@@ -464,7 +493,7 @@ public class GameServer : IDisposable
 
         if (disposing)
         {
-            _udpClient.Dispose();
+            _udpClient?.Dispose();
             _udpClient = null;
         }
 

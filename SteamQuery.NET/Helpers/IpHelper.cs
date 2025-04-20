@@ -5,9 +5,9 @@ using SteamQuery.Exceptions;
 
 namespace SteamQuery.Helpers;
 
-internal static class IpHelper
+public static class IpHelper
 {
-    internal static IPEndPoint CreateIpEndPoint(string endpoint, AddressFamily addressFamily = AddressFamily.InterNetwork)
+    public static IPEndPoint CreateIpEndPoint(string endpoint, AddressFamily addressFamily = AddressFamily.InterNetwork)
     {
         if (string.IsNullOrEmpty(endpoint))
         {
@@ -35,7 +35,7 @@ internal static class IpHelper
         return CreateIpEndPoint(parts.First(), port, addressFamily);
     }
 
-    internal static IPEndPoint CreateIpEndPoint(string hostNameOrIpAddress, int port, AddressFamily addressFamily = AddressFamily.InterNetwork)
+    public static IPEndPoint CreateIpEndPoint(string hostNameOrIpAddress, int port, AddressFamily addressFamily = AddressFamily.InterNetwork)
     {
         if (string.IsNullOrEmpty(hostNameOrIpAddress))
         {

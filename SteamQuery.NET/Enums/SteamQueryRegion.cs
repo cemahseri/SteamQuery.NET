@@ -2,8 +2,8 @@
 
 public enum SteamQueryRegion : byte
 {
-    UsEastCoast,
-    UsWestCoast,
+    UsEast,
+    UsWest,
     SouthAmerica,
     Europe,
     Asia,
