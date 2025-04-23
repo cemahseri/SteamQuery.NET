@@ -357,9 +357,9 @@ public class GameServer : IDisposable
     //   and used CancellationToken.
     private async Task<byte[]> ExecuteQueryAsync(byte[] request, CancellationToken cancellationToken)
     {
-        await _udpClient.SendAsync([ ..PacketHeader, ..request ], PacketHeader.Length + request.Length).WaitAsync(SendTimeout, cancellationToken);
+        await _udpClient.SendAsync([ ..PacketHeader, ..request ], PacketHeader.Length + request.Length).TimeoutAfterAsync(SendTimeout, cancellationToken);
 
-        var response = (await _udpClient.ReceiveAsync().WaitAsync(ReceiveTimeout, cancellationToken)).Buffer;
+        var response = (await _udpClient.ReceiveAsync().TimeoutAfterAsync(ReceiveTimeout, cancellationToken)).Buffer;
 
         var packetHeader = response.ReadPacketIdentifier();
         if (packetHeader == PacketIdentifier.Split)
@@ -393,7 +393,7 @@ public class GameServer : IDisposable
 
             for (var i = 1; i < multiPacketHeader.TotalPackets; i++)
             {
-                remainingPackets.Add((await _udpClient.ReceiveAsync().WaitAsync(ReceiveTimeout, cancellationToken)).Buffer);
+                remainingPackets.Add((await _udpClient.ReceiveAsync().TimeoutAfterAsync(ReceiveTimeout, cancellationToken)).Buffer);
             }
 
             // Combine the first response and remaining packets - of course after ordering it by packet number and trimming the packet header, just like above.

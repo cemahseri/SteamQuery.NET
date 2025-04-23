@@ -14,7 +14,7 @@ public static class IpHelper
             throw new ArgumentNullException(nameof(endpoint));
         }
 
-        var parts = endpoint.Split(':', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        var parts = endpoint.Split(':');
         if (parts.Length != 2)
         {
             // If result of splitting the endpoint by colon does not return 2 items, it means that endpoint format is wrong.

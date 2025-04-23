@@ -2,16 +2,14 @@
 [![NuGet Downloads (SteamQuery.NET)](https://img.shields.io/nuget/dt/SteamQuery.NET?style=for-the-badge&color=D800FF)](https://www.nuget.org/packages/SteamQuery.NET)
 
 # SteamQuery.NET
-Yet another Steam API .NET wrapper.
-
 Supports [server queries](https://developer.valvesoftware.com/wiki/Server_queries) (Source, GoldSource, and obsolete GoldSource) and [master server query](https://developer.valvesoftware.com/wiki/Master_Server_Query_Protocol) protocols.
 
 # Usage
 You can check out the [wiki](https://github.com/cemahseri/SteamQuery.NET/wiki)!
 
 # To-Do
-- Steam Web API (for querying a master server in the first place).
 - Source RCON Protocol.
+- Steam Web API (for querying a master server in the first place).
 - Add dependency injection support for Master Server Query Protocol and Web API.
 
 ## For More Information

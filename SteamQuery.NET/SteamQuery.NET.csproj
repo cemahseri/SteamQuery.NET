@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>Library</OutputType>
-    <TargetFrameworks>net9.0</TargetFrameworks>
+    <TargetFrameworks>netstandard2.0;netstandard2.1;net8.0;net9.0</TargetFrameworks>
 
     <ImplicitUsings>enable</ImplicitUsings>
 
@@ -12,8 +12,8 @@
 
   <PropertyGroup>
     <PackageId>SteamQuery.NET</PackageId>
-    <Description>Yet another Steam server queries .NET wrapper.</Description>
-    <Version>2.0.0</Version>
+    <Description>Yet another Steam server queries and master server query protocol .NET wrapper.</Description>
+    <Version>2.0.1</Version>
     <Authors>cemahseri</Authors>
 
     <RepositoryUrl>https://github.com/cemahseri/SteamQuery.NET</RepositoryUrl>
@@ -38,5 +38,9 @@
 
   <ItemGroup>
     <PackageReference Include="SharpZipLib" Version="1.4.2" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(TargetFramework)' == 'netstandard2.0'">
+    <PackageReference Include="Microsoft.Bcl.AsyncInterfaces" Version="9.0.4" />
   </ItemGroup>
 </Project>

@@ -4,6 +4,7 @@ using System.Runtime.CompilerServices;
 using System.Text;
 using SteamQuery.Enums;
 using SteamQuery.Exceptions;
+using SteamQuery.Extensions;
 using SteamQuery.Models;
 
 namespace SteamQuery;
@@ -127,7 +128,7 @@ public class MasterServer : IDisposable
                 yield return result;
             }
 
-            if (response[^6..].All(b => b == 0x00))
+            if (response.Skip(results.Count - 6).All(b => b == 0x00))
             {
                 yield break;
             }
@@ -158,9 +159,9 @@ public class MasterServer : IDisposable
         {
             byte[] request = [ PacketHeader, (byte)region, ..Encoding.UTF8.GetBytes(currentServerEndpoint + "\0"), ..filterBytes ];
 
-            await _udpClient.SendAsync(request, request.Length).WaitAsync(SendTimeout, cancellationToken);
+            await _udpClient.SendAsync(request, request.Length).TimeoutAfterAsync(SendTimeout, cancellationToken);
 
-            var response = (await _udpClient.ReceiveAsync().WaitAsync(ReceiveTimeout, cancellationToken)).Buffer;
+            var response = (await _udpClient.ReceiveAsync().TimeoutAfterAsync(ReceiveTimeout, cancellationToken)).Buffer;
 
             var results = MasterServerResponseReader.ParseResponse(response);
 
@@ -169,7 +170,7 @@ public class MasterServer : IDisposable
                 yield return result;
             }
 
-            if (response[^6..].All(b => b == 0x00))
+            if (response.Skip(results.Count - 6).All(b => b == 0x00))
             {
                 yield break;
             }
