@@ -13,7 +13,7 @@
   <PropertyGroup>
     <PackageId>SteamQuery.NET</PackageId>
     <Description>Yet another Steam server queries and master server query protocol .NET wrapper.</Description>
-    <Version>2.0.1</Version>
+    <Version>2.0.2</Version>
     <Authors>cemahseri</Authors>
 
     <RepositoryUrl>https://github.com/cemahseri/SteamQuery.NET</RepositoryUrl>
@@ -41,6 +41,6 @@
   </ItemGroup>
 
   <ItemGroup Condition="'$(TargetFramework)' == 'netstandard2.0'">
-    <PackageReference Include="Microsoft.Bcl.AsyncInterfaces" Version="9.0.4" />
+    <PackageReference Include="Microsoft.Bcl.AsyncInterfaces" Version="9.0.6" />
   </ItemGroup>
 </Project>

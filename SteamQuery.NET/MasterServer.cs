@@ -128,7 +128,7 @@ public class MasterServer : IDisposable
                 yield return result;
             }
 
-            if (response.Skip(results.Count - 6).All(b => b == 0x00))
+            if (response.Skip(response.Length - 6).All(b => b == 0x00))
             {
                 yield break;
             }
@@ -170,7 +170,7 @@ public class MasterServer : IDisposable
                 yield return result;
             }
 
-            if (response.Skip(results.Count - 6).All(b => b == 0x00))
+            if (response.Skip(response.Length - 6).All(b => b == 0x00))
             {
                 yield break;
             }
