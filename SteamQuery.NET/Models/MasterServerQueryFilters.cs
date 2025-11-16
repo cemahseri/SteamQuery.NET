@@ -46,7 +46,7 @@ public sealed class MasterServerQueryFilters
 
     public string IpAddress { get; set; }
 
-    public byte[] GetFilterBytes()
+    internal byte[] GetFilterBytes()
     {
         var stringBuilder = new StringBuilder();
 

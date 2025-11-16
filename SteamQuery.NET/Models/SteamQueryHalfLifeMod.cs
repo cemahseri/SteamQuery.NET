@@ -1,10 +1,10 @@
 ﻿namespace SteamQuery.Models;
 
-public record SteamQueryHalfLifeMod
+public class SteamQueryHalfLifeMod
 {
-    public string Link { get; internal set; }
+    public string Link { get; internal init; }
 
-    public string DownloadLink { get; internal set; }
+    public string DownloadLink { get; internal init; }
 
     public int Version { get; internal set; }
 

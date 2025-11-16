@@ -8,7 +8,7 @@ public class UnexpectedByteException : Exception
     /// <summary>
     /// Initializes a new instance of the <see cref="UnexpectedByteException"/> class.
     /// </summary>
-    public UnexpectedByteException(byte received, IEnumerable<byte> bytes)
+    public UnexpectedByteException(byte received, byte[] bytes)
         : base($"{string.Join(", ", bytes.Select(b => b.ToString("X2")))} bytes are expected but instead received {received:X2}.")
     {
     }

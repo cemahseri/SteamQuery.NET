@@ -1,8 +1,8 @@
 ﻿namespace SteamQuery.Models;
 
-internal sealed record MultiPacketHeader
+internal sealed class MultiPacketHeader
 {
-    internal bool IsGoldSourceServer { get; set; }
+    internal bool IsGoldSourceServer { get; init; }
 
     internal int Id { get; set; }
 

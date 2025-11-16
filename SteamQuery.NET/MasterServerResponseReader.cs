@@ -3,33 +3,33 @@ using SteamQuery.Models;
 
 namespace SteamQuery;
 
-internal sealed class MasterServerResponseReader
+internal static class MasterServerResponseReader
 {
-    internal static IReadOnlyList<MasterServerResponse> ParseResponse(byte[] response)
+    internal static IReadOnlyCollection<MasterServerResponse> ParseResponse(ReadOnlySpan<byte> response)
     {
-        var result = new List<MasterServerResponse>();
-
-        using var binaryReader = new BinaryReader(new MemoryStream(response));
-        
-        var responseHeader = binaryReader.ReadBytes(6);
-        if (!responseHeader.SequenceEqual(new byte[]{ 0xFF, 0xFF, 0xFF, 0xFF, 0x66, 0x0A }))
+        if (!response[..6].SequenceEqual((ReadOnlySpan<byte>)[0xFF, 0xFF, 0xFF, 0xFF, 0x66, 0x0A]))
         {
             throw new Exception("Response header is not what expected.");
         }
+        
+        var results = new List<MasterServerResponse>(231);
 
-        while (binaryReader.BaseStream.Position != response.Length)
+        var index = 6;
+        while (index != response.Length)
         {
-            var ipAddressOctetBytes = binaryReader.ReadBytes(4);
-            var port = (ushort)((binaryReader.ReadByte() << 8) + binaryReader.ReadByte());
+            var ipAddressOctetBytes = response.Slice(index, 4);
+            index += 4;
 
-            if (ipAddressOctetBytes.All(b => b == 0x00) && port == 0)
+            var port = (ushort)((response[index++] << 8) + response[index++]);
+
+            if (ipAddressOctetBytes.IndexOfAnyExcept<byte>(0) == -1 && port == 0)
             {
                 break;
             }
 
-            result.Add(new MasterServerResponse(new IPAddress(ipAddressOctetBytes), port));
+            results.Add(new MasterServerResponse(new IPAddress(ipAddressOctetBytes), port));
         }
 
-        return result;
+        return results;
     }
 }

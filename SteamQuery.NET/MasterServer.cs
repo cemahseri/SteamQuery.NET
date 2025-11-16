@@ -1,10 +1,10 @@
-﻿using System.Net;
+﻿using System.Buffers;
+using System.Net;
 using System.Net.Sockets;
 using System.Runtime.CompilerServices;
 using System.Text;
 using SteamQuery.Enums;
 using SteamQuery.Exceptions;
-using SteamQuery.Extensions;
 using SteamQuery.Models;
 
 namespace SteamQuery;
@@ -12,74 +12,47 @@ namespace SteamQuery;
 /// <summary>
 /// Master server class.
 /// </summary>
-/// <remarks>Thread-safe.</remarks>
 public class MasterServer : IDisposable
 {
     /// <summary>
     /// IP endpoint of the server.
     /// </summary>
-    public IPEndPoint IpEndPoint
-    {
-        get => _ipEndPoint;
-        set
-        {
-            _ipEndPoint = value;
-
-            Reestablish();
-        }
-    }
+    public MasterServerEndPoint MasterServerEndPoint { get; set; }
 
     /// <summary>
     /// IP address of the server.
     /// </summary>
-    public IPAddress IpAddress => IpEndPoint.Address;
+    public IPAddress IpAddress
+    {
+        get => MasterServerEndPoint.IpEndPoint.Address;
+        set => MasterServerEndPoint.IpEndPoint.Address = value;
+    }
 
     /// <summary>
     /// Port number of the server.
     /// </summary>
-    public int Port => IpEndPoint.Port;
+    public int Port
+    {
+        get => MasterServerEndPoint.IpEndPoint.Port;
+        set => MasterServerEndPoint.IpEndPoint.Port = value;
+    }
     
     /// <summary>
     /// The timeout after which a connection or query call should be faulted with a <see cref="TimeoutException"/> if it hasn't otherwise completed.
     /// <para>The default value is 30 seconds.</para>
     /// </summary>
-    public TimeSpan SendTimeout
-    {
-        get;
-        set
-        {
-            field = value;
-
-            if (_udpClient != null && _udpClient.Client.Connected)
-            {
-                _udpClient.Client.SendTimeout = (int)value.TotalMilliseconds;
-            }
-        }
-    } = TimeSpan.FromSeconds(30.0d);
+    public TimeSpan SendTimeout { get; set; } = TimeSpan.FromSeconds(5.0d);
     
     /// <summary>
     /// The timeout after which a query receive call should be faulted with a <see cref="TimeoutException"/> if it hasn't otherwise completed.
     /// <para>The default value is 30 seconds.</para>
     /// </summary>
-    public TimeSpan ReceiveTimeout
-    {
-        get;
-        set
-        {
-            field = value;
-
-            if (_udpClient != null && _udpClient.Client.Connected)
-            {
-                _udpClient.Client.ReceiveTimeout = (int)value.TotalMilliseconds;
-            }
-        }
-    } = TimeSpan.FromSeconds(30.0d);
-
-    private UdpClient _udpClient;
-    private IPEndPoint _ipEndPoint;
+    public TimeSpan ReceiveTimeout { get; set; } = TimeSpan.FromSeconds(5.0d);
     
+    private readonly Socket _socket = new(SocketType.Dgram, ProtocolType.Udp);
+
     private bool _disposed;
-    
+
     private const byte PacketHeader = 0x31;
 
     /// <summary>
@@ -93,7 +66,7 @@ public class MasterServer : IDisposable
     /// <exception cref="SocketException">Thrown when host is known.</exception>
     public MasterServer(MasterServerEndPoint masterServerEndPoint)
     {
-        IpEndPoint = masterServerEndPoint.IpEndPoint;
+        MasterServerEndPoint = masterServerEndPoint;
     }
     
     /// <summary>
@@ -103,65 +76,42 @@ public class MasterServer : IDisposable
     {
     }
     
-    // For comments, check the GamerServer class.
-    /// <summary>
-    /// Gets servers synchronously.
-    /// </summary>
-    public IEnumerable<MasterServerResponse> GetServers(MasterServerQueryFilters filters = null, SteamQueryRegion region = SteamQueryRegion.All)
-    {
-        var currentServerEndpoint = "0.0.0.0:0";
-        
-        var filterBytes = filters?.GetFilterBytes() ?? [ 0x00 ];
-
-        while (true)
-        {
-            byte[] request = [ PacketHeader, (byte)region, ..Encoding.UTF8.GetBytes(currentServerEndpoint + "\0"), ..filterBytes ];
-            
-            _udpClient.Send(request, request.Length);
-
-            var response = _udpClient.Receive(ref _ipEndPoint);
-
-            var results = MasterServerResponseReader.ParseResponse(response);
-
-            foreach (var result in results)
-            {
-                yield return result;
-            }
-
-            if (response.Skip(response.Length - 6).All(b => b == 0x00))
-            {
-                yield break;
-            }
-
-            var lastServer = results.LastOrDefault();
-            if (lastServer == default)
-            {
-                yield break;
-            }
-
-            currentServerEndpoint = $"{lastServer.IpAddress}:{lastServer.Port}";
-        }
-    }
-
     /// <summary>
     /// Gets servers asynchronously.
     /// </summary>
     public async IAsyncEnumerable<MasterServerResponse> GetServersAsync(
-        MasterServerQueryFilters filters = null,
+        MasterServerQueryFilters? filters = null,
         SteamQueryRegion region = SteamQueryRegion.All,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
-        var currentServerEndpoint = "0.0.0.0:0";
+        var currentServerEndpoint = "0.0.0.0:0\0";
 
-        var filterBytes = filters?.GetFilterBytes() ?? [ 0x00 ];
-
+        var filterBytes = filters != null ? filters.GetFilterBytes() : [ 0x00 ];
+        
         while (true)
         {
-            byte[] request = [ PacketHeader, (byte)region, ..Encoding.UTF8.GetBytes(currentServerEndpoint + "\0"), ..filterBytes ];
+            using var sendCancellationTokenSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            sendCancellationTokenSource.CancelAfter(SendTimeout);
+            
+            byte[] request = [ PacketHeader, (byte)region, ..Encoding.UTF8.GetBytes(currentServerEndpoint), ..filterBytes ];
 
-            await _udpClient.SendAsync(request, request.Length).TimeoutAfterAsync(SendTimeout, cancellationToken);
+            await _socket.SendToAsync(request, MasterServerEndPoint.IpEndPoint, sendCancellationTokenSource.Token);
+            
+            using var receiveCancellationTokenSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            receiveCancellationTokenSource.CancelAfter(ReceiveTimeout);
 
-            var response = (await _udpClient.ReceiveAsync().TimeoutAfterAsync(ReceiveTimeout, cancellationToken)).Buffer;
+            byte[] response;
+
+            var buffer = ArrayPool<byte>.Shared.Rent(64 * 1024);
+            try
+            {
+                var receiveFromResult = await _socket.ReceiveFromAsync(buffer, MasterServerEndPoint.IpEndPoint, receiveCancellationTokenSource.Token);
+                response = buffer.AsSpan(0, receiveFromResult.ReceivedBytes).ToArray();
+            }
+            finally
+            {
+                ArrayPool<byte>.Shared.Return(buffer);
+            }
 
             var results = MasterServerResponseReader.ParseResponse(response);
 
@@ -170,7 +120,7 @@ public class MasterServer : IDisposable
                 yield return result;
             }
 
-            if (response.Skip(response.Length - 6).All(b => b == 0x00))
+            if (response.TakeLast(6).All(b => b == 0x00))
             {
                 yield break;
             }
@@ -181,45 +131,10 @@ public class MasterServer : IDisposable
                 yield break;
             }
 
-            currentServerEndpoint = $"{lastServer.IpAddress}:{lastServer.Port}";
+            currentServerEndpoint = $"{lastServer.IpAddress}:{lastServer.Port}\0";
         }
     }
-    
-    /// <summary>
-    /// Initializes socket.
-    /// </summary>
-    public void Initialize()
-    {
-        _udpClient = new UdpClient
-        {
-            Client =
-            {
-                SendTimeout = (int)SendTimeout.TotalMilliseconds,
-                ReceiveTimeout = (int)ReceiveTimeout.TotalMilliseconds
-            }
-        };
 
-        _udpClient.Connect(IpEndPoint);
-    }
-    
-    /// <summary>
-    /// Reestablishes socket.
-    /// </summary>
-    public void Reestablish()
-    {
-        Close();
-
-        Initialize();
-    }
-    
-    /// <summary>
-    /// Closes socket.
-    /// </summary>
-    public void Close()
-    {
-        _udpClient?.Close();
-    }
-    
     /// <summary>
     /// Disposes the class.
     /// </summary>
@@ -239,8 +154,7 @@ public class MasterServer : IDisposable
 
         if (disposing)
         {
-            _udpClient?.Dispose();
-            _udpClient = null;
+            _socket.Dispose();
         }
 
         _disposed = true;

@@ -2,7 +2,7 @@
 
 namespace SteamQuery.Models;
 
-public record SteamQueryInformation
+public class SteamQueryInformation
 {
     public byte ProtocolVersion { get; internal set; }
 
@@ -56,5 +56,5 @@ public record SteamQueryInformation
     public bool? IsHalfLifeMod { get; internal set; }
 
     // If the IsHalfLifeMod is true.
-    public SteamQueryHalfLifeMod HalfLifeMod { get; internal set; } = new();
+    public SteamQueryHalfLifeMod HalfLifeMod { get; internal set; }
 }

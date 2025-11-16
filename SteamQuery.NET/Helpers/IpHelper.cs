@@ -7,15 +7,14 @@ namespace SteamQuery.Helpers;
 
 public static class IpHelper
 {
-    public static IPEndPoint CreateIpEndPoint(string endpoint, AddressFamily addressFamily = AddressFamily.InterNetwork)
+    public static IPEndPoint CreateIpEndPoint(ReadOnlySpan<char> endpoint, AddressFamily addressFamily = AddressFamily.InterNetwork)
     {
-        if (string.IsNullOrEmpty(endpoint))
+        if (endpoint.IsEmpty)
         {
-            throw new ArgumentNullException(nameof(endpoint));
+            throw new ArgumentException("The value cannot be empty.", nameof(endpoint));
         }
 
-        var parts = endpoint.Split(':');
-        if (parts.Length != 2)
+        if (endpoint.Count(':') != 1)
         {
             // If result of splitting the endpoint by colon does not return 2 items, it means that endpoint format is wrong.
             // Example 1: "localhost"
@@ -25,21 +24,23 @@ public static class IpHelper
             throw new FormatException("Invalid endpoint format.");
         }
 
+        var indexOfColon = endpoint.IndexOf(':');
+
         // By using NumberStyles.None number style, we do not allow leading or trailing white space, thousands separators, or a decimal separator.
         // It means that the string to be parsed must consist of integral decimal digits only.
-        if (!ushort.TryParse(parts.Last(), NumberStyles.None, NumberFormatInfo.InvariantInfo, out var port))
+        if (!ushort.TryParse(endpoint[(indexOfColon + 1)..], NumberStyles.None, NumberFormatInfo.InvariantInfo, out var port))
         {
             throw new InvalidPortException();
         }
 
-        return CreateIpEndPoint(parts.First(), port, addressFamily);
+        return CreateIpEndPoint(endpoint[..indexOfColon], port, addressFamily);
     }
 
-    public static IPEndPoint CreateIpEndPoint(string hostNameOrIpAddress, int port, AddressFamily addressFamily = AddressFamily.InterNetwork)
+    public static IPEndPoint CreateIpEndPoint(ReadOnlySpan<char> hostNameOrIpAddress, int port, AddressFamily addressFamily = AddressFamily.InterNetwork)
     {
-        if (string.IsNullOrEmpty(hostNameOrIpAddress))
+        if (hostNameOrIpAddress.IsEmpty)
         {
-            throw new ArgumentNullException(nameof(hostNameOrIpAddress));
+            throw new ArgumentException("The value cannot be empty.", nameof(hostNameOrIpAddress));
         }
         
         if (port is < IPEndPoint.MinPort or > IPEndPoint.MaxPort)
@@ -47,11 +48,10 @@ public static class IpHelper
             throw new ArgumentOutOfRangeException(nameof(port));
         }
 
-        // If it's not a valid IP address, then it might be a hostname like: play.somehostname.com
+        // If it's not a valid IP address, then it might be a hostname like: play.hostname.com
         if (!IPAddress.TryParse(hostNameOrIpAddress, out var ipAddress))
         {
-            ipAddress = Dns.GetHostAddresses(hostNameOrIpAddress)
-                .FirstOrDefault(ip => ip.AddressFamily == addressFamily);
+            ipAddress = Dns.GetHostAddresses(hostNameOrIpAddress.ToString(), addressFamily).FirstOrDefault();
 
             if (ipAddress == null)
             {

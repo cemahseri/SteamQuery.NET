@@ -1,4 +1,5 @@
-﻿using System.Net;
+﻿using System.Buffers;
+using System.Net;
 using System.Net.Sockets;
 using ICSharpCode.SharpZipLib.BZip2;
 using SteamQuery.Enums;
@@ -10,28 +11,27 @@ using SteamQuery.Models;
 namespace SteamQuery;
 
 /// <summary>
-/// Game server class holds information related to a game server in it.
+/// Game server class that holds information related to a game server in it.
 /// </summary>
-/// <remarks>Thread-safe.</remarks>
 public class GameServer : IDisposable
 {
     /// <summary>
     /// Information of the server.
-    /// <para>Available after calling <see cref="GetInformationAsync"/> or <see cref="PerformQueryAsync"/> - or obviously their synchronous versions.</para>
+    /// <para>Available after calling <see cref="GetInformationAsync"/> or <see cref="PerformQueriesAsync(SteamQueryA2SQuery, CancellationToken)"/>.</para>
     /// </summary>
-    public SteamQueryInformation Information { get; private set; } = new();
+    public SteamQueryInformation? Information { get; private set; }
 
     /// <summary>
     /// Players of the server.
-    /// <para>Available after calling <see cref="GetPlayersAsync"/> or <see cref="PerformQueryAsync"/> - or obviously their synchronous versions.</para>
+    /// <para>Available after calling <see cref="GetPlayersAsync"/> or <see cref="PerformQueriesAsync(SteamQueryA2SQuery, CancellationToken)"/>.</para>
     /// </summary>
-    public IReadOnlyList<SteamQueryPlayer> Players { get; private set; } = [];
+    public IReadOnlyList<SteamQueryPlayer>? Players { get; private set; }
 
     /// <summary>
     /// Rules of the server.
-    /// <para>Available after calling <see cref="GetRulesAsync"/> or <see cref="PerformQueryAsync"/> - or obviously their synchronous versions.</para>
+    /// <para>Available after calling <see cref="GetRulesAsync"/> or <see cref="PerformQueriesAsync(SteamQueryA2SQuery, CancellationToken)"/>.</para>
     /// </summary>
-    public IReadOnlyList<SteamQueryRule> Rules { get; private set; } = [];
+    public IReadOnlyList<SteamQueryRule>? Rules { get; private set; }
 
     /// <summary>
     /// If the server is using compression before sending response.
@@ -43,65 +43,39 @@ public class GameServer : IDisposable
     /// <summary>
     /// IP endpoint of the server.
     /// </summary>
-    public IPEndPoint IpEndPoint
-    {
-        get => _ipEndPoint;
-        set
-        {
-            _ipEndPoint = value;
-
-            Reestablish();
-        }
-    }
+    public IPEndPoint IpEndPoint { get; set; }
 
     /// <summary>
     /// IP address of the server.
     /// </summary>
-    public IPAddress IpAddress => IpEndPoint.Address;
+    public IPAddress IpAddress
+    {
+        get => IpEndPoint.Address;
+        set => IpEndPoint.Address = value;
+    }
 
     /// <summary>
     /// Port number of the server.
     /// </summary>
-    public int Port => IpEndPoint.Port;
+    public int Port
+    {
+        get => IpEndPoint.Port;
+        set => IpEndPoint.Port = value;
+    }
     
     /// <summary>
     /// The timeout after which a connection or query call should be faulted with a <see cref="TimeoutException"/> if it hasn't otherwise completed.
     /// <para>The default value is 30 seconds.</para>
     /// </summary>
-    public TimeSpan SendTimeout
-    {
-        get;
-        set
-        {
-            field = value;
-            
-            if (_udpClient != null && _udpClient.Client.Connected)
-            {
-                _udpClient.Client.SendTimeout = (int)value.TotalMilliseconds;
-            }
-        }
-    } = TimeSpan.FromSeconds(30.0d);
+    public TimeSpan SendTimeout { get; set; } = TimeSpan.FromSeconds(5.0d);
     
     /// <summary>
     /// The timeout after which a query receive call should be faulted with a <see cref="TimeoutException"/> if it hasn't otherwise completed.
     /// <para>The default value is 30 seconds.</para>
     /// </summary>
-    public TimeSpan ReceiveTimeout
-    {
-        get;
-        set
-        {
-            field = value;
-
-            if (_udpClient != null && _udpClient.Client.Connected)
-            {
-                _udpClient.Client.ReceiveTimeout = (int)value.TotalMilliseconds;
-            }
-        }
-    } = TimeSpan.FromSeconds(30.0d);
-
-    private UdpClient _udpClient;
-    private IPEndPoint _ipEndPoint;
+    public TimeSpan ReceiveTimeout { get; set; } = TimeSpan.FromSeconds(5.0d);
+    
+    private readonly Socket _socket = new(SocketType.Dgram, ProtocolType.Udp);
 
     private bool _disposed;
 
@@ -126,8 +100,7 @@ public class GameServer : IDisposable
     /// <exception cref="FormatException">Thrown when endPoint is not in correct format.</exception>
     /// <exception cref="InvalidPortException">Thrown when port in endPoint is not in correct format.</exception>
     /// <exception cref="ArgumentOutOfRangeException">Thrown when port is not valid.</exception>
-    /// <exception cref="AddressNotFoundException">Thrown when IP address hostname is not found.</exception>
-    /// <exception cref="SocketException">Thrown when host is known.</exception>
+    /// <exception cref="AddressNotFoundException">Thrown when IP address or hostname is not found.</exception>
     public GameServer(string endPoint, AddressFamily addressFamily = AddressFamily.InterNetwork) : this(IpHelper.CreateIpEndPoint(endPoint, addressFamily))
     {
     }
@@ -145,7 +118,6 @@ public class GameServer : IDisposable
     /// <exception cref="ArgumentNullException">Thrown when hostNameOrIpAddress is null or empty.</exception>
     /// <exception cref="ArgumentOutOfRangeException">Thrown when port is not valid.</exception>
     /// <exception cref="AddressNotFoundException">Thrown when IP address or hostname is not found.</exception>
-    /// <exception cref="SocketException">Thrown when host is known.</exception>
     public GameServer(string hostNameOrIpAddress, int port, AddressFamily addressFamily = AddressFamily.InterNetwork) : this(IpHelper.CreateIpEndPoint(hostNameOrIpAddress, port, addressFamily))
     {
     }
@@ -175,24 +147,9 @@ public class GameServer : IDisposable
     {
         IpEndPoint = ipEndPoint;
     }
-    
-    /// <summary>
-    /// Initialize a new instance of the <see cref="GameServer"/> class.
-    /// </summary>
-    public GameServer()
-    {
-    }
 
     /// <summary>
-    /// Gets information synchronously.
-    /// </summary>
-    public SteamQueryInformation GetInformation()
-    {
-        return Information = ServerQueryResponseReader.ParseInformation(ExecuteQuery(InformationRequest));
-    }
-
-    /// <summary>
-    /// Gets information asynchronously.
+    /// Gets information.
     /// </summary>
     public async Task<SteamQueryInformation> GetInformationAsync(CancellationToken cancellationToken = default)
     {
@@ -200,15 +157,7 @@ public class GameServer : IDisposable
     }
 
     /// <summary>
-    /// Gets players synchronously.
-    /// </summary>
-    public IReadOnlyList<SteamQueryPlayer> GetPlayers()
-    {
-        return Players = ServerQueryResponseReader.ParsePlayers(ExecuteQuery(PlayersRequest));
-    }
-
-    /// <summary>
-    /// Gets players asynchronously.
+    /// Gets players.
     /// </summary>
     public async Task<IReadOnlyList<SteamQueryPlayer>> GetPlayersAsync(CancellationToken cancellationToken = default)
     {
@@ -216,49 +165,25 @@ public class GameServer : IDisposable
     }
 
     /// <summary>
-    /// Gets rules synchronously.
-    /// </summary>
-    public IReadOnlyList<SteamQueryRule> GetRules()
-    {
-        return Rules = ServerQueryResponseReader.ParseRules(ExecuteQuery(RulesRequest));
-    }
-
-    /// <summary>
-    /// Gets rules asynchronously.
+    /// Gets rules.
     /// </summary>
     public async Task<IReadOnlyList<SteamQueryRule>> GetRulesAsync(CancellationToken cancellationToken = default)
     {
         return Rules = ServerQueryResponseReader.ParseRules(await ExecuteQueryAsync(RulesRequest, cancellationToken));
     }
-
+    
     /// <summary>
-    /// Performs given queries synchronously.
+    /// Performs all queries.
     /// </summary>
-    /// <param name="queries">Queries to be performed.</param>
-    public void PerformQuery(SteamQueryA2SQuery queries = SteamQueryA2SQuery.All)
-    {
-        if (queries.HasFlag(SteamQueryA2SQuery.Information))
-        {
-            GetInformation();
-        }
-
-        if (queries.HasFlag(SteamQueryA2SQuery.Players))
-        {
-            GetPlayers();
-        }
-
-        if (queries.HasFlag(SteamQueryA2SQuery.Rules))
-        {
-            GetRules();
-        }
-    }
+    /// <param name="cancellationToken">A <see cref="CancellationToken" /> to observe while waiting for the task to complete.</param>
+    public Task PerformQueriesAsync(CancellationToken cancellationToken = default) => PerformQueriesAsync(SteamQueryA2SQuery.All, cancellationToken);
 
     /// <summary>
-    /// Performs given queries asynchronously.
+    /// Performs given queries.
     /// </summary>
     /// <param name="queries">Queries to be performed.</param>
     /// <param name="cancellationToken">A <see cref="CancellationToken" /> to observe while waiting for the task to complete.</param>
-    public async Task PerformQueryAsync(SteamQueryA2SQuery queries = SteamQueryA2SQuery.All, CancellationToken cancellationToken = default)
+    public async Task PerformQueriesAsync(SteamQueryA2SQuery queries, CancellationToken cancellationToken = default)
     {
         if (queries.HasFlag(SteamQueryA2SQuery.Information))
         {
@@ -276,204 +201,124 @@ public class GameServer : IDisposable
         }
     }
 
-    // For comments, check the asynchronous method.
-    private byte[] ExecuteQuery(byte[] request)
-    {
-        _udpClient.Send([ ..PacketHeader, ..request ], PacketHeader.Length + request.Length);
-
-        var response = _udpClient.Receive(ref _ipEndPoint);
-
-        var packetHeader = response.ReadPacketIdentifier();
-        if (packetHeader == PacketIdentifier.Split)
-        {
-            var multiPacketHeader = response.ReadMultiPacketHeader();
-
-            if (!multiPacketHeader.IsGoldSourceServer)
-            {
-                IsUsingCompression = multiPacketHeader.IsCompressed;
-
-                if (multiPacketHeader.IsCompressed)
-                {
-                    throw new NotImplementedException("Compressed packets not implemented yet. Please report server IP address and port, so I can test it.");
-                }
-            }
-
-            var payloadIndex = multiPacketHeader.IsGoldSourceServer switch
-            {
-                false when multiPacketHeader.IsCompressed => 20,
-                false when !multiPacketHeader.IsCompressed => 12,
-                _ => 9
-            };
-
-            response = response.Skip(payloadIndex).ToArray();
-
-            var remainingPackets = new List<byte[]>(multiPacketHeader.TotalPackets);
-
-            for (var i = 1; i < multiPacketHeader.TotalPackets; i++)
-            {
-                remainingPackets.Add(_udpClient.Receive(ref _ipEndPoint));
-            }
-
-            response =
-            [
-                ..response,
-                ..remainingPackets.OrderBy(p => p.ReadMultiPacketHeader().PacketNumber).SelectMany(p => p.Skip(payloadIndex))
-            ];
-
-            if (multiPacketHeader.IsCompressed)
-            {
-                using var compressedMemoryStream = new MemoryStream(response);
-                using var decompressedMemoryStream = new MemoryStream();
-
-                BZip2.Decompress(compressedMemoryStream, decompressedMemoryStream, false);
-
-                response = decompressedMemoryStream.ToArray();
-            }
-
-            return response;
-        }
-
-        var responsePayloadHeader = response.ReadResponsePayloadIdentifier();
-        if (responsePayloadHeader == PayloadIdentifier.Challenge)
-        {
-            return ExecuteQuery(
-            [
-                ..request.ReadRequestPayloadIdentifier() == PayloadIdentifier.Information ? request : [ request[0] ],
-                ..response.Skip(response.Length - 4)
-            ]);
-        }
-
-        if (responsePayloadHeader == PayloadIdentifier.ObsoleteGoldSource && request == InformationRequest)
-        {
-            Reestablish();
-        }
-
-        return response;
-    }
-
-    // The main reason that I separated synchronous method and the asynchronous method is, there is not that much benefit
-    //   writing synchronous method then running it in a Task and calling it the "asynchronous version".
-    // So, instead of that, I had separated two methods and used asynchronous methods on the asynchronous method, such as UdpClient.SendAsync (instead of Send), UdpClient.ReceiveAsync (Receive),
-    //   and used CancellationToken.
     private async Task<byte[]> ExecuteQueryAsync(byte[] request, CancellationToken cancellationToken)
     {
-        await _udpClient.SendAsync([ ..PacketHeader, ..request ], PacketHeader.Length + request.Length).TimeoutAfterAsync(SendTimeout, cancellationToken);
+        var shouldSend = true; //TODO refactor
 
-        var response = (await _udpClient.ReceiveAsync().TimeoutAfterAsync(ReceiveTimeout, cancellationToken)).Buffer;
-
-        var packetHeader = response.ReadPacketIdentifier();
-        if (packetHeader == PacketIdentifier.Split)
+        while (true)
         {
-            var multiPacketHeader = response.ReadMultiPacketHeader();
-
-            if (!multiPacketHeader.IsGoldSourceServer)
+            if (shouldSend)
             {
-                IsUsingCompression = multiPacketHeader.IsCompressed;
+                using var sendCancellationTokenSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                sendCancellationTokenSource.CancelAfter(SendTimeout);
+            
+                await _socket.SendToAsync((byte[])[..PacketHeader, ..request], IpEndPoint, sendCancellationTokenSource.Token);
 
+                shouldSend = false;
+            }
+            
+            using var receiveCancellationTokenSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            receiveCancellationTokenSource.CancelAfter(ReceiveTimeout);
+
+            byte[] response;
+
+            var buffer = ArrayPool<byte>.Shared.Rent(64 * 1024);
+            try
+            {
+                var receiveFromResult = await _socket.ReceiveFromAsync(buffer, IpEndPoint, receiveCancellationTokenSource.Token);
+                response = buffer.AsSpan(0, receiveFromResult.ReceivedBytes).ToArray();
+            }
+            finally
+            {
+                ArrayPool<byte>.Shared.Return(buffer);
+            }
+
+            var packetHeader = response.ReadPacketIdentifier();
+            if (packetHeader == PacketIdentifier.Split)
+            {
+                var multiPacketHeader = response.ReadMultiPacketHeader();
+
+                if (!multiPacketHeader.IsGoldSourceServer)
+                {
+                    IsUsingCompression = multiPacketHeader.IsCompressed;
+
+                    if (multiPacketHeader.IsCompressed)
+                    {
+                        throw new NotImplementedException("Compressed packets not implemented yet. Please report server IP address and port, so I can test it.");
+                    }
+                }
+
+                var payloadIndex = multiPacketHeader.IsGoldSourceServer switch
+                {
+                    // Packet Header(4) + ID(4) + Total Packets(1) + Packet Number(1) + Maximum Packet Size(2) + Decompressed Size(4) + CRC32 Checksum(4)
+                    false when multiPacketHeader.IsCompressed => 20,
+                    // Packet Header(4) + ID(4) + Total Packets(1) + Packet Number(1) + Maximum Packet Size(2)
+                    false when !multiPacketHeader.IsCompressed => 12,
+                    // Packet Header(4) + ID(4) + Packet Number(1)
+                    _ => 9
+                };
+
+                // We do not need the packet header. We already processed it and won't need again. So, just trim it.
+                response = response.Skip(payloadIndex).ToArray();
+
+                var remainingPackets = new List<byte[]>(multiPacketHeader.TotalPackets);
+
+                for (var i = 1; i < multiPacketHeader.TotalPackets; i++)
+                {
+                    byte[] packetResponse;
+
+                    buffer = ArrayPool<byte>.Shared.Rent(64 * 1024);
+                    try
+                    {
+                        var receiveFromResult = await _socket.ReceiveFromAsync(buffer, IpEndPoint, receiveCancellationTokenSource.Token);
+                        packetResponse = buffer.AsSpan(0, receiveFromResult.ReceivedBytes).ToArray();
+                    }
+                    finally
+                    {
+                        ArrayPool<byte>.Shared.Return(buffer);
+                    }
+
+                    remainingPackets.Add(packetResponse);
+                }
+
+                // Combine the first response and remaining packets - of course after ordering it by packet number and trimming the packet header, just like above.
+                response = [..response, ..remainingPackets.OrderBy(p => p.ReadMultiPacketHeader().PacketNumber).SelectMany(p => p.Skip(payloadIndex))];
+
+                //TODO Add controls for uncompressed size and CRC32 checksum.
                 if (multiPacketHeader.IsCompressed)
                 {
-                    throw new NotImplementedException("Compressed packets not implemented yet. Please report server IP address and port, so I can test it.");
+                    // Need to strip the packet header before decompressing it.
+                    using var compressedMemoryStream = new MemoryStream(response);
+                    using var decompressedMemoryStream = new MemoryStream();
+
+                    BZip2.Decompress(compressedMemoryStream, decompressedMemoryStream, false);
+
+                    response = decompressedMemoryStream.ToArray();
                 }
+
+                return response;
             }
 
-            var payloadIndex = multiPacketHeader.IsGoldSourceServer switch
+            var responsePayloadHeader = response.ReadResponsePayloadIdentifier();
+            if (responsePayloadHeader == PayloadIdentifier.Challenge)
             {
-                // Packet Header(4) + ID(4) + Total Packets(1) + Packet Number(1) + Maximum Packet Size(2) + Decompressed Size(4) + CRC32 Checksum(4)
-                false when multiPacketHeader.IsCompressed => 20,
-                // Packet Header(4) + ID(4) + Total Packets(1) + Packet Number(1) + Maximum Packet Size(2)
-                false when !multiPacketHeader.IsCompressed => 12,
-                // Packet Header(4) + ID(4) + Packet Number(1)
-                _ => 9
-            };
-
-            // We do not need the packet header. We already processed it and won't need again. So, just trim it.
-            response = response.Skip(payloadIndex).ToArray();
-
-            var remainingPackets = new List<byte[]>(multiPacketHeader.TotalPackets);
-
-            for (var i = 1; i < multiPacketHeader.TotalPackets; i++)
-            {
-                remainingPackets.Add((await _udpClient.ReceiveAsync().TimeoutAfterAsync(ReceiveTimeout, cancellationToken)).Buffer);
+                request = [..request.ReadRequestPayloadIdentifier() == PayloadIdentifier.Information ? request : [request.First()], ..response.TakeLast(4)];
+                shouldSend = true;
+                continue;
             }
 
-            // Combine the first response and remaining packets - of course after ordering it by packet number and trimming the packet header, just like above.
-            response =
-            [
-                ..response,
-                ..remainingPackets.OrderBy(p => p.ReadMultiPacketHeader().PacketNumber).SelectMany(p => p.Skip(payloadIndex))
-            ];
-
-            //TODO Add controls for uncompressed size and CRC32 checksum.
-            if (multiPacketHeader.IsCompressed)
+            // Obsolete GoldSource might send both obsolete and the new information packet on Information query.
+            // It is not always guaranteed. Server won't tell us if there is a second packet.
+            // So instead of reading the second packet, just reestablish the connection.
+            if (responsePayloadHeader == PayloadIdentifier.ObsoleteGoldSource && request == InformationRequest)
             {
-                // Need to strip the packet header before decompressing it.
-                using var compressedMemoryStream = new MemoryStream(response);
-                using var decompressedMemoryStream = new MemoryStream();
-
-                BZip2.Decompress(compressedMemoryStream, decompressedMemoryStream, false);
-
-                response = decompressedMemoryStream.ToArray();
+                continue;
             }
-
+            
             return response;
         }
-
-        var responsePayloadHeader = response.ReadResponsePayloadIdentifier();
-        if (responsePayloadHeader == PayloadIdentifier.Challenge)
-        {
-            return await ExecuteQueryAsync(
-            [
-                ..request.ReadRequestPayloadIdentifier() == PayloadIdentifier.Information ? request : [ request.First() ],
-                ..response.Skip(response.Length - 4)
-            ], cancellationToken);
-        }
-
-        // Obsolete GoldSource might send both obsolete and the new information packet on Information query.
-        // It is not always guaranteed. Server won't tell us if there is a second packet.
-        // So instead of reading the second packet, just reestablish the connection.
-        if (responsePayloadHeader == PayloadIdentifier.ObsoleteGoldSource && request == InformationRequest)
-        {
-            Reestablish();
-        }
-
-        return response;
     }
-
-    /// <summary>
-    /// Initializes socket.
-    /// </summary>
-    public void Initialize()
-    {
-        _udpClient = new UdpClient
-        {
-            Client =
-            {
-                SendTimeout = (int)SendTimeout.TotalMilliseconds,
-                ReceiveTimeout = (int)ReceiveTimeout.TotalMilliseconds
-            }
-        };
-
-        _udpClient.Connect(IpEndPoint);
-    }
-
-    /// <summary>
-    /// Reestablishes socket.
-    /// </summary>
-    public void Reestablish()
-    {
-        Close();
-
-        Initialize();
-    }
-
-    /// <summary>
-    /// Closes socket.
-    /// </summary>
-    public void Close()
-    {
-        _udpClient?.Close();
-    }
-
+    
     /// <summary>
     /// Disposes the class.
     /// </summary>
@@ -493,8 +338,7 @@ public class GameServer : IDisposable
 
         if (disposing)
         {
-            _udpClient?.Dispose();
-            _udpClient = null;
+            _socket.Dispose();
         }
 
         _disposed = true;

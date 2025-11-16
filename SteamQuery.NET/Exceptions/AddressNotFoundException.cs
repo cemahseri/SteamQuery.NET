@@ -8,8 +8,7 @@ public class AddressNotFoundException : Exception
     /// <summary>
     /// Initializes a new instance of the <see cref="AddressNotFoundException"/> class.
     /// </summary>
-    public AddressNotFoundException()
-        : base("IP address or host could not be found.")
+    public AddressNotFoundException() : base("IP address or host could not be found.")
     {
     }
 }
