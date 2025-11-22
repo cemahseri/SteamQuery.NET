@@ -133,13 +133,13 @@ public sealed class MasterServerQueryFilters
         if (GameData.Any())
         {
             stringBuilder.Append(@"\gamedata\")
-                .Append(string.Join(",", GameTypes));
+                .Append(string.Join(",", GameData));
         }
 
         if (GameDataOr.Any())
         {
             stringBuilder.Append(@"\gamedataor\")
-                .Append(string.Join(",", GameTypes));
+                .Append(string.Join(",", GameDataOr));
         }
 
         if (!string.IsNullOrEmpty(Version))
