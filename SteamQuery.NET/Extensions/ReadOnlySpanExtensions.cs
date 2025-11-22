@@ -1,4 +1,6 @@
-﻿using System.Runtime.InteropServices;
+using System.Buffers.Binary;
+using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using System.Text;
 using SteamQuery.Enums;
 using SteamQuery.Models;
@@ -9,24 +11,27 @@ internal static class ReadOnlySpanExtensions
 {
     extension(ReadOnlySpan<byte> source)
     {
-        internal PacketIdentifier ReadPacketIdentifier() => (PacketIdentifier)MemoryMarshal.Read<int>(source[..4]);
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal PacketIdentifier ReadPacketIdentifier() => (PacketIdentifier)BinaryPrimitives.ReadInt32LittleEndian(source);
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal PayloadIdentifier ReadRequestPayloadIdentifier() => (PayloadIdentifier)source[0];
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal PayloadIdentifier ReadResponsePayloadIdentifier() => (PayloadIdentifier)source[4];
 
         internal MultiPacketHeader ReadMultiPacketHeader()
         {
-            var index = 9;
+            var isGoldSource = BinaryPrimitives.ReadInt32LittleEndian(source.Slice(9, 4)) == -1;
+
+            var index = 4;
 
             var multiPacketHeader = new MultiPacketHeader
             {
-                IsGoldSourceServer = MemoryMarshal.Read<int>(source.Slice(index, 4)) == -1
+                IsGoldSourceServer = isGoldSource,
+                Id = BinaryPrimitives.ReadInt32LittleEndian(source.Slice(index, 4))
             };
 
-            index = 4;
-
-            multiPacketHeader.Id = MemoryMarshal.Read<int>(source.Slice(index, 4));
             index += 4;
 
             if (multiPacketHeader.IsGoldSourceServer)
@@ -38,20 +43,20 @@ internal static class ReadOnlySpanExtensions
             }
             else
             {
-                // Reading most significant bit.
                 multiPacketHeader.IsCompressed = ((multiPacketHeader.Id >> 31) & 1) == 1;
 
                 multiPacketHeader.TotalPackets = source[index++];
                 multiPacketHeader.PacketNumber = source[index++];
+
                 multiPacketHeader.MaximumPacketSize = MemoryMarshal.Read<short>(source.Slice(index, 2));
                 index += 2;
 
                 if (multiPacketHeader.IsCompressed)
                 {
-                    multiPacketHeader.UncompressedResponseSize = MemoryMarshal.Read<int>(source.Slice(index, 2));
+                    multiPacketHeader.UncompressedResponseSize = MemoryMarshal.Read<int>(source.Slice(index, 4));
                     index += 4;
 
-                    multiPacketHeader.Crc32Checksum = MemoryMarshal.Read<int>(source.Slice(index, 2));
+                    multiPacketHeader.Crc32Checksum = MemoryMarshal.Read<int>(source.Slice(index, 4));
                 }
             }
 
@@ -63,7 +68,7 @@ internal static class ReadOnlySpanExtensions
             var indexOfNullCharacter = source[index..].IndexOf<byte>(0x00);
 
             var @string = Encoding.UTF8.GetString(source.Slice(index, indexOfNullCharacter));
-        
+
             index += indexOfNullCharacter + 1;
 
             return @string;

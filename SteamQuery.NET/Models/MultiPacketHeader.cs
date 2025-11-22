@@ -4,7 +4,7 @@ internal sealed class MultiPacketHeader
 {
     internal bool IsGoldSourceServer { get; init; }
 
-    internal int Id { get; set; }
+    internal int Id { get; init; }
 
     internal int TotalPackets { get; set; }
 
