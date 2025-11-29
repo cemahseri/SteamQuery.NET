@@ -56,5 +56,5 @@ public class SteamQueryInformation
     public bool? IsHalfLifeMod { get; internal set; }
 
     // If the IsHalfLifeMod is true.
-    public SteamQueryHalfLifeMod HalfLifeMod { get; internal set; }
+    public SteamQueryHalfLifeMod? HalfLifeMod { get; internal set; }
 }

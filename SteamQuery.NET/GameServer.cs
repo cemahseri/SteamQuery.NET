@@ -1,7 +1,7 @@
-﻿using System.Buffers;
+using System.Buffers;
 using System.Net;
 using System.Net.Sockets;
-using ICSharpCode.SharpZipLib.BZip2;
+//using ICSharpCode.SharpZipLib.BZip2;
 using SteamQuery.Enums;
 using SteamQuery.Exceptions;
 using SteamQuery.Extensions;
@@ -13,26 +13,9 @@ namespace SteamQuery;
 /// <summary>
 /// Game server class that holds information related to a game server in it.
 /// </summary>
+/// TODO make thread safe
 public class GameServer : IDisposable
 {
-    /// <summary>
-    /// Information of the server.
-    /// <para>Available after calling <see cref="GetInformationAsync"/> or <see cref="PerformQueriesAsync(SteamQueryA2SQuery, CancellationToken)"/>.</para>
-    /// </summary>
-    public SteamQueryInformation? Information { get; private set; }
-
-    /// <summary>
-    /// Players of the server.
-    /// <para>Available after calling <see cref="GetPlayersAsync"/> or <see cref="PerformQueriesAsync(SteamQueryA2SQuery, CancellationToken)"/>.</para>
-    /// </summary>
-    public IReadOnlyList<SteamQueryPlayer>? Players { get; private set; }
-
-    /// <summary>
-    /// Rules of the server.
-    /// <para>Available after calling <see cref="GetRulesAsync"/> or <see cref="PerformQueriesAsync(SteamQueryA2SQuery, CancellationToken)"/>.</para>
-    /// </summary>
-    public IReadOnlyList<SteamQueryRule>? Rules { get; private set; }
-
     /// <summary>
     /// If the server is using compression before sending response.
     /// <para>If the server is using Source protocol, this property will be available after calling any query that will return multi-packet response.</para>
@@ -43,37 +26,33 @@ public class GameServer : IDisposable
     /// <summary>
     /// IP endpoint of the server.
     /// </summary>
-    public IPEndPoint IpEndPoint { get; set; }
+    public IPEndPoint IpEndPoint { get; }
 
     /// <summary>
     /// IP address of the server.
     /// </summary>
-    public IPAddress IpAddress
-    {
-        get => IpEndPoint.Address;
-        set => IpEndPoint.Address = value;
-    }
+    public IPAddress IpAddress => IpEndPoint.Address;
 
     /// <summary>
     /// Port number of the server.
     /// </summary>
-    public int Port
-    {
-        get => IpEndPoint.Port;
-        set => IpEndPoint.Port = value;
-    }
-    
-    /// <summary>
-    /// The timeout after which a connection or query call should be faulted with a <see cref="TimeoutException"/> if it hasn't otherwise completed.
-    /// <para>The default value is 30 seconds.</para>
-    /// </summary>
-    public TimeSpan SendTimeout { get; set; } = TimeSpan.FromSeconds(5.0d);
-    
+    public int Port => IpEndPoint.Port;
+
     /// <summary>
     /// The timeout after which a query receive call should be faulted with a <see cref="TimeoutException"/> if it hasn't otherwise completed.
-    /// <para>The default value is 30 seconds.</para>
+    /// <para>The default value is 5 seconds.</para>
     /// </summary>
-    public TimeSpan ReceiveTimeout { get; set; } = TimeSpan.FromSeconds(5.0d);
+    public TimeSpan Timeout { get; set; } = TimeSpan.FromSeconds(5.0d);
+    
+    /// <summary>
+    /// Initial response and GoldSource multi-packet response buffer size.
+    /// <para>The default value is 2048 bytes. (Value is clamped between 1500 and 65507 bytes.)</para>
+    /// </summary>
+    public int BufferSize
+    {
+        get;
+        set => field = Math.Clamp(value, 1500, 65507);
+    } = 2048;
     
     private readonly Socket _socket = new(SocketType.Dgram, ProtocolType.Udp);
 
@@ -85,6 +64,10 @@ public class GameServer : IDisposable
     private static readonly byte[] InformationRequest = [ (byte)PayloadIdentifier.Information, .."Source Engine Query\0"u8 ];
     private static readonly byte[] PlayersRequest     = [ (byte)PayloadIdentifier.Players,     ..DefaultChallenge ];
     private static readonly byte[] RulesRequest       = [ (byte)PayloadIdentifier.Rules,       ..DefaultChallenge ];
+    
+    private readonly SemaphoreSlim _semaphoreSlim = new(1, 1);
+
+    private readonly record struct Packet(int PacketNumber, byte[] Buffer, int Length);
 
     /// <summary>
     /// Initialize a new instance of the <see cref="GameServer"/> class with given endpoint - in <see cref="string"/> type.
@@ -146,6 +129,8 @@ public class GameServer : IDisposable
     public GameServer(IPEndPoint ipEndPoint)
     {
         IpEndPoint = ipEndPoint;
+
+        _socket.Connect(IpEndPoint);
     }
 
     /// <summary>
@@ -153,172 +138,271 @@ public class GameServer : IDisposable
     /// </summary>
     public async Task<SteamQueryInformation> GetInformationAsync(CancellationToken cancellationToken = default)
     {
-        return Information = ServerQueryResponseReader.ParseInformation(await ExecuteQueryAsync(InformationRequest, cancellationToken));
+        ObjectDisposedException.ThrowIf(_disposed, typeof(GameServer));
+
+        using var responseMemoryOwner = await ExecuteQueryAsync(InformationRequest, cancellationToken).ConfigureAwait(ConfigureAwaitOptions.None);
+        return ServerQueryResponseReader.ParseInformation(responseMemoryOwner.Memory.Span);
     }
 
     /// <summary>
     /// Gets players.
     /// </summary>
-    public async Task<IReadOnlyList<SteamQueryPlayer>> GetPlayersAsync(CancellationToken cancellationToken = default)
+    public async Task<SteamQueryPlayer[]> GetPlayersAsync(CancellationToken cancellationToken = default)
     {
-        return Players = ServerQueryResponseReader.ParsePlayers(await ExecuteQueryAsync(PlayersRequest, cancellationToken));
+        ObjectDisposedException.ThrowIf(_disposed, typeof(GameServer));
+
+        using var responseMemoryOwner = await ExecuteQueryAsync(PlayersRequest, cancellationToken).ConfigureAwait(ConfigureAwaitOptions.None);
+        return ServerQueryResponseReader.ParsePlayers(responseMemoryOwner.Memory.Span);
     }
 
     /// <summary>
     /// Gets rules.
     /// </summary>
-    public async Task<IReadOnlyList<SteamQueryRule>> GetRulesAsync(CancellationToken cancellationToken = default)
+    public async Task<SteamQueryRule[]> GetRulesAsync(CancellationToken cancellationToken = default)
     {
-        return Rules = ServerQueryResponseReader.ParseRules(await ExecuteQueryAsync(RulesRequest, cancellationToken));
+        ObjectDisposedException.ThrowIf(_disposed, typeof(GameServer));
+
+        using var responseMemoryOwner = await ExecuteQueryAsync(RulesRequest, cancellationToken).ConfigureAwait(ConfigureAwaitOptions.None);
+        return ServerQueryResponseReader.ParseRules(responseMemoryOwner.Memory.Span);
     }
     
     /// <summary>
     /// Performs all queries.
     /// </summary>
     /// <param name="cancellationToken">A <see cref="CancellationToken" /> to observe while waiting for the task to complete.</param>
-    public Task PerformQueriesAsync(CancellationToken cancellationToken = default) => PerformQueriesAsync(SteamQueryA2SQuery.All, cancellationToken);
+    public Task<(SteamQueryInformation? Information, SteamQueryPlayer[]? Players, SteamQueryRule[]? Rules)>
+        PerformQueriesAsync(CancellationToken cancellationToken = default) => PerformQueriesAsync(SteamQueryA2SQuery.All, cancellationToken);
+
 
     /// <summary>
     /// Performs given queries.
     /// </summary>
     /// <param name="queries">Queries to be performed.</param>
     /// <param name="cancellationToken">A <see cref="CancellationToken" /> to observe while waiting for the task to complete.</param>
-    public async Task PerformQueriesAsync(SteamQueryA2SQuery queries, CancellationToken cancellationToken = default)
+    /// <returns>
+    /// Tuple where non-requested items are null: (<see cref="SteamQueryInformation"/>, <see cref="SteamQueryPlayer"/>[], <see cref="SteamQueryRule"/>[])
+    /// </returns>
+    public async Task<(SteamQueryInformation? Information, SteamQueryPlayer[]? Players, SteamQueryRule[]? Rules)>
+        PerformQueriesAsync(SteamQueryA2SQuery queries, CancellationToken cancellationToken = default)
     {
+        SteamQueryInformation? information = null;
+        SteamQueryPlayer[]? players = null;
+        SteamQueryRule[]? rules = null;
+
         if (queries.HasFlag(SteamQueryA2SQuery.Information))
         {
-            await GetInformationAsync(cancellationToken);
+            information = await GetInformationAsync(cancellationToken).ConfigureAwait(ConfigureAwaitOptions.None);
         }
 
         if (queries.HasFlag(SteamQueryA2SQuery.Players))
         {
-            await GetPlayersAsync(cancellationToken);
+            players = await GetPlayersAsync(cancellationToken).ConfigureAwait(ConfigureAwaitOptions.None);
         }
 
         if (queries.HasFlag(SteamQueryA2SQuery.Rules))
         {
-            await GetRulesAsync(cancellationToken);
+            rules = await GetRulesAsync(cancellationToken).ConfigureAwait(ConfigureAwaitOptions.None);
         }
+
+        return (information, players, rules);
     }
 
-    private async Task<byte[]> ExecuteQueryAsync(byte[] request, CancellationToken cancellationToken)
+    private async Task<IMemoryOwner<byte>> ExecuteQueryAsync(byte[] request, CancellationToken cancellationToken)
     {
-        var shouldSend = true; //TODO refactor
+        await _semaphoreSlim.WaitAsync(cancellationToken);
 
-        while (true)
+        try
         {
-            if (shouldSend)
+            var shouldSend = true; //TODO refactor
+
+            while (true)
             {
-                using var sendCancellationTokenSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-                sendCancellationTokenSource.CancelAfter(SendTimeout);
-            
-                await _socket.SendToAsync((byte[])[..PacketHeader, ..request], IpEndPoint, sendCancellationTokenSource.Token);
-
-                shouldSend = false;
-            }
-            
-            using var receiveCancellationTokenSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            receiveCancellationTokenSource.CancelAfter(ReceiveTimeout);
-
-            byte[] response;
-
-            var buffer = ArrayPool<byte>.Shared.Rent(64 * 1024);
-            try
-            {
-                var receiveFromResult = await _socket.ReceiveFromAsync(buffer, IpEndPoint, receiveCancellationTokenSource.Token);
-                response = buffer.AsSpan(0, receiveFromResult.ReceivedBytes).ToArray();
-            }
-            finally
-            {
-                ArrayPool<byte>.Shared.Return(buffer);
-            }
-
-            var packetHeader = response.ReadPacketIdentifier();
-            if (packetHeader == PacketIdentifier.Split)
-            {
-                var multiPacketHeader = response.ReadMultiPacketHeader();
-
-                if (!multiPacketHeader.IsGoldSourceServer)
+                if (shouldSend)
                 {
-                    IsUsingCompression = multiPacketHeader.IsCompressed;
+                    var sendBufferLength = PacketHeader.Length + request.Length;
 
-                    if (multiPacketHeader.IsCompressed)
-                    {
-                        throw new NotImplementedException("Compressed packets not implemented yet. Please report server IP address and port, so I can test it.");
-                    }
+                    Span<byte> sendBuffer = stackalloc byte[sendBufferLength];
+                    PacketHeader.CopyTo(sendBuffer);
+                    request.AsSpan().CopyTo(sendBuffer[PacketHeader.Length..]);
+
+                    _socket.Send(sendBuffer);
+
+                    shouldSend = false;
+                }
+                
+                using var receiveCancellationTokenSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                if (Timeout.TotalMilliseconds > 0)
+                {
+                    receiveCancellationTokenSource.CancelAfter(Timeout);
                 }
 
-                var payloadIndex = multiPacketHeader.IsGoldSourceServer switch
+                var initialBuffer = ArrayPool<byte>.Shared.Rent(BufferSize);
+
+                int firstReceived;
+                try
                 {
-                    // Packet Header(4) + ID(4) + Total Packets(1) + Packet Number(1) + Maximum Packet Size(2) + Decompressed Size(4) + CRC32 Checksum(4)
-                    false when multiPacketHeader.IsCompressed => 20,
-                    // Packet Header(4) + ID(4) + Total Packets(1) + Packet Number(1) + Maximum Packet Size(2)
-                    false when !multiPacketHeader.IsCompressed => 12,
-                    // Packet Header(4) + ID(4) + Packet Number(1)
-                    _ => 9
-                };
-
-                // We do not need the packet header. We already processed it and won't need again. So, just trim it.
-                response = response.Skip(payloadIndex).ToArray();
-
-                var remainingPackets = new List<byte[]>(multiPacketHeader.TotalPackets);
-
-                for (var i = 1; i < multiPacketHeader.TotalPackets; i++)
+                    firstReceived = await _socket.ReceiveAsync(initialBuffer, receiveCancellationTokenSource.Token).ConfigureAwait(false);
+                }
+                catch (OperationCanceledException operationCanceledException) when (!cancellationToken.IsCancellationRequested && receiveCancellationTokenSource.IsCancellationRequested)
                 {
-                    byte[] packetResponse;
+                    ArrayPool<byte>.Shared.Return(initialBuffer);
+                    throw new TimeoutException(null, operationCanceledException);
+                }
+                catch (SocketException socketException) when (socketException.SocketErrorCode == SocketError.TimedOut)
+                {
+                    ArrayPool<byte>.Shared.Return(initialBuffer);
+                    throw new TimeoutException(null, socketException);
+                }
 
-                    buffer = ArrayPool<byte>.Shared.Rent(64 * 1024);
+                var bufferSpan = new ReadOnlyMemory<byte>(initialBuffer, 0, firstReceived);
+
+                var packetHeader = bufferSpan.Span.ReadPacketIdentifier();
+                if (packetHeader == PacketIdentifier.Split)
+                {
+                    var firstPacketHeader = bufferSpan.Span.ReadMultiPacketHeader();
+
+                    if (!firstPacketHeader.IsGoldSourceServer)
+                    {
+                        IsUsingCompression = firstPacketHeader.IsCompressed;
+
+                        if (firstPacketHeader.IsCompressed)
+                        {
+                            ArrayPool<byte>.Shared.Return(initialBuffer);
+                            throw new NotImplementedException("Compressed packets not implemented yet.");
+                        }
+                    }
+
+                    var payloadIndex = firstPacketHeader.IsGoldSourceServer switch
+                    {
+                        // Packet Header(4) + ID(4) + Total Packets(1) + Packet Number(1) + Maximum Packet Size(2) + Decompressed Size(4) + CRC32 Checksum(4)
+                        false when firstPacketHeader.IsCompressed => 20,
+                        // Packet Header(4) + ID(4) + Total Packets(1) + Packet Number(1) + Maximum Packet Size(2)
+                        false when !firstPacketHeader.IsCompressed => 12,
+                        // Packet Header(4) + ID(4) + Packet Number(1)
+                        _ => 9
+                    };
+
+                    var packetCount = firstPacketHeader.TotalPackets - 1;
+                    var packets = new Packet[packetCount];
+                    
+                    var packetBufferSize = firstPacketHeader.IsGoldSourceServer || firstPacketHeader.MaximumPacketSize <= 0
+                        ? BufferSize
+                        : firstPacketHeader.MaximumPacketSize;
+
                     try
                     {
-                        var receiveFromResult = await _socket.ReceiveFromAsync(buffer, IpEndPoint, receiveCancellationTokenSource.Token);
-                        packetResponse = buffer.AsSpan(0, receiveFromResult.ReceivedBytes).ToArray();
+                        for (var i = 0; i < packetCount; i++)
+                        {
+                            var packetBuffer = ArrayPool<byte>.Shared.Rent(packetBufferSize);
+
+                            try
+                            {
+                                var receiveFromResult = await _socket.ReceiveAsync(packetBuffer, receiveCancellationTokenSource.Token).ConfigureAwait(false);
+
+                                var multiPacketHeader = packetBuffer.AsSpan(0, receiveFromResult).ReadMultiPacketHeader();
+                                packets[i] = new Packet(multiPacketHeader.PacketNumber, packetBuffer, receiveFromResult);
+                            }
+                            catch
+                            {
+                                ArrayPool<byte>.Shared.Return(packetBuffer);
+                                throw;
+                            }
+                        }
+
+                        Array.Sort(packets, (a, b) => a.PacketNumber.CompareTo(b.PacketNumber));
+
+                        var orderedPacketsMemory = new ReadOnlyMemory<byte>[packets.Length];
+                        for (var i = 0; i < packets.Length; i++)
+                        {
+                            var packet = packets[i];
+
+                            orderedPacketsMemory[i] = packet.Buffer.AsMemory(0, packet.Length);
+                        }
+
+                        var firstPayloadLength = Math.Max(0, bufferSpan.Span.Length - payloadIndex);
+
+                        var totalLength = firstPayloadLength + packets.Sum(p => Math.Max(0, p.Length - payloadIndex));
+                        var responseMemoryOwner = MemoryPool<byte>.Shared.Rent(totalLength);
+
+                        var destinationOffset = 0;
+
+                        if (firstPayloadLength > 0)
+                        {
+                            bufferSpan.Span.Slice(payloadIndex, firstPayloadLength).CopyTo(responseMemoryOwner.Memory.Span.Slice(destinationOffset, firstPayloadLength));
+                            destinationOffset += firstPayloadLength;
+                        }
+
+                        foreach (var packet in orderedPacketsMemory)
+                        {
+                            var packetSpanLength = Math.Max(0, packet.Span.Length - payloadIndex);
+                            if (packetSpanLength <= 0)
+                            {
+                                continue;
+                            }
+
+                            packet.Span.Slice(payloadIndex, packetSpanLength).CopyTo(responseMemoryOwner.Memory.Span.Slice(destinationOffset, packetSpanLength));
+                            destinationOffset += packetSpanLength;
+                        }
+
+                        //TODO Add controls for uncompressed size and CRC32 checksum.
+                        /*if (multiPacketHeader.IsCompressed)
+                        {
+                            // Need to strip the packet header before decompressing it.
+                            using var compressedMemoryStream = new MemoryStream(response);
+                            using var decompressedMemoryStream = new MemoryStream();
+
+                            BZip2.Decompress(compressedMemoryStream, decompressedMemoryStream, false);
+
+                            response = decompressedMemoryStream.ToArray();
+                        }*/
+
+                        return responseMemoryOwner;
                     }
                     finally
                     {
-                        ArrayPool<byte>.Shared.Return(buffer);
+                        foreach (var packet in packets)
+                        {
+                            ArrayPool<byte>.Shared.Return(packet.Buffer);
+                        }
+
+                        ArrayPool<byte>.Shared.Return(initialBuffer);
                     }
-
-                    remainingPackets.Add(packetResponse);
                 }
 
-                // Combine the first response and remaining packets - of course after ordering it by packet number and trimming the packet header, just like above.
-                response = [..response, ..remainingPackets.OrderBy(p => p.ReadMultiPacketHeader().PacketNumber).SelectMany(p => p.Skip(payloadIndex))];
-
-                //TODO Add controls for uncompressed size and CRC32 checksum.
-                if (multiPacketHeader.IsCompressed)
+                var responsePayloadHeader = bufferSpan.Span.ReadResponsePayloadIdentifier();
+                if (responsePayloadHeader == PayloadIdentifier.Challenge)
                 {
-                    // Need to strip the packet header before decompressing it.
-                    using var compressedMemoryStream = new MemoryStream(response);
-                    using var decompressedMemoryStream = new MemoryStream();
+                    //TODO reduce allocation
+                    request = [..request.ReadRequestPayloadIdentifier() == PayloadIdentifier.Information ? request : [request.First()], ..bufferSpan[^4..].ToArray()];
+                    shouldSend = true;
 
-                    BZip2.Decompress(compressedMemoryStream, decompressedMemoryStream, false);
-
-                    response = decompressedMemoryStream.ToArray();
+                    ArrayPool<byte>.Shared.Return(initialBuffer);
+                    continue;
                 }
 
-                return response;
-            }
+                // Obsolete GoldSource might send both obsolete and the new information packet on Information query.
+                // It is not always guaranteed. Server won't tell us if there is a second packet.
+                // So instead of reading the second packet, just reestablish the connection.
+                if (responsePayloadHeader == PayloadIdentifier.ObsoleteGoldSource && request == InformationRequest)
+                {
+                    ArrayPool<byte>.Shared.Return(initialBuffer);
+                    continue;
+                }
 
-            var responsePayloadHeader = response.ReadResponsePayloadIdentifier();
-            if (responsePayloadHeader == PayloadIdentifier.Challenge)
-            {
-                request = [..request.ReadRequestPayloadIdentifier() == PayloadIdentifier.Information ? request : [request.First()], ..response.TakeLast(4)];
-                shouldSend = true;
-                continue;
-            }
+                var ownerSingle = MemoryPool<byte>.Shared.Rent(firstReceived);
 
-            // Obsolete GoldSource might send both obsolete and the new information packet on Information query.
-            // It is not always guaranteed. Server won't tell us if there is a second packet.
-            // So instead of reading the second packet, just reestablish the connection.
-            if (responsePayloadHeader == PayloadIdentifier.ObsoleteGoldSource && request == InformationRequest)
-            {
-                continue;
+                initialBuffer.AsSpan(0, firstReceived).CopyTo(ownerSingle.Memory.Span);
+                ArrayPool<byte>.Shared.Return(initialBuffer);
+
+                return ownerSingle;
             }
-            
-            return response;
+        }
+        finally
+        {
+            _semaphoreSlim.Release();
         }
     }
-    
+
     /// <summary>
     /// Disposes the class.
     /// </summary>
@@ -335,12 +419,13 @@ public class GameServer : IDisposable
         {
             return;
         }
+        
+        _disposed = true;
 
         if (disposing)
         {
             _socket.Dispose();
+            _semaphoreSlim.Dispose();
         }
-
-        _disposed = true;
     }
 }

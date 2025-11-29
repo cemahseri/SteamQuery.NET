@@ -174,13 +174,13 @@ internal static class ServerQueryResponseReader
         return information;
     }
 
-    internal static IReadOnlyList<SteamQueryPlayer> ParsePlayers(ReadOnlySpan<byte> response)
+    internal static SteamQueryPlayer[] ParsePlayers(ReadOnlySpan<byte> response)
     {
         var index = 5;
 
         var playerCount = response[index++];
 
-        var players = new List<SteamQueryPlayer>(playerCount);
+        var players = new SteamQueryPlayer[playerCount];
         for (var i = 0; i < playerCount; i++)
         {
             var playerIndex = response[index++];
@@ -192,26 +192,26 @@ internal static class ServerQueryResponseReader
             var durationSeconds = MemoryMarshal.Read<float>(response.Slice(index, 4));
             index += 4;
 
-            players.Add(new SteamQueryPlayer(playerIndex, name, score, durationSeconds));
+            players[i] = new SteamQueryPlayer(playerIndex, name, score, durationSeconds);
         }
 
         return players;
     }
 
-    internal static IReadOnlyList<SteamQueryRule> ParseRules(ReadOnlySpan<byte> response)
+    internal static SteamQueryRule[] ParseRules(ReadOnlySpan<byte> response)
     {
         var index = 5;
 
         var ruleCount = MemoryMarshal.Read<short>(response.Slice(index, 2));
         index += 2;
         
-        var rules = new List<SteamQueryRule>(ruleCount);
+        var rules = new SteamQueryRule[ruleCount];
         for (var i = 0; i < ruleCount; i++)
         {
             var name = response.ReadNullTerminatedString(ref index);
             var value = response.ReadNullTerminatedString(ref index);
 
-            rules.Add(new SteamQueryRule(name, value));
+            rules[i] = new SteamQueryRule(name, value);
         }
 
         return rules;

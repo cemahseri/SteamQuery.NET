@@ -1,6 +1,6 @@
 ﻿namespace SteamQuery.Models;
 
-internal sealed class MultiPacketHeader
+internal ref struct MultiPacketHeader
 {
     internal bool IsGoldSourceServer { get; init; }
 

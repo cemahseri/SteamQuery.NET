@@ -1,4 +1,3 @@
-using System.Buffers.Binary;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -12,7 +11,7 @@ internal static class ReadOnlySpanExtensions
     extension(ReadOnlySpan<byte> source)
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal PacketIdentifier ReadPacketIdentifier() => (PacketIdentifier)BinaryPrimitives.ReadInt32LittleEndian(source);
+        internal PacketIdentifier ReadPacketIdentifier() => (PacketIdentifier)MemoryMarshal.Read<int>(source[..4]);
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal PayloadIdentifier ReadRequestPayloadIdentifier() => (PayloadIdentifier)source[0];
@@ -22,14 +21,14 @@ internal static class ReadOnlySpanExtensions
 
         internal MultiPacketHeader ReadMultiPacketHeader()
         {
-            var isGoldSource = BinaryPrimitives.ReadInt32LittleEndian(source.Slice(9, 4)) == -1;
+            var isGoldSource = MemoryMarshal.Read<int>(source.Slice(9, 4)) == -1;
 
             var index = 4;
 
             var multiPacketHeader = new MultiPacketHeader
             {
                 IsGoldSourceServer = isGoldSource,
-                Id = BinaryPrimitives.ReadInt32LittleEndian(source.Slice(index, 4))
+                Id = MemoryMarshal.Read<int>(source.Slice(index, 4))
             };
 
             index += 4;
